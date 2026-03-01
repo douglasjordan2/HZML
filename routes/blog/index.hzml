@@ -1,10 +1,15 @@
 <server>
-  get((request) => {
-    const posts = [
-      { id: "1", title: "Getting Started with HZML" },
-      { id: "2", title: "Why Server-Side Rendering Matters" },
-      { id: "3", title: "The Case for Web Primitives" },
-    ]
+  hzml.db.run("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, body TEXT NOT NULL)")
+
+  const seed = hzml.db.query("SELECT COUNT(*) as count FROM posts")
+  if (seed[0].count === 0) {
+    hzml.db.run("INSERT INTO posts (title, body) VALUES (?, ?)", ["Getting Started with HZML", "HZML is a minimal web framework built on web primitives."])
+    hzml.db.run("INSERT INTO posts (title, body) VALUES (?, ?)", ["Why Server-Side Rendering Matters", "SSR delivers content faster and works without JavaScript."])
+    hzml.db.run("INSERT INTO posts (title, body) VALUES (?, ?)", ["The Case for Web Primitives", "HTMZ, SSE, and tagged templates are all you need."])
+  }
+
+  hzml.get((request) => {
+    const posts = hzml.db.query("SELECT id, title FROM posts")
     return { posts }
   })
 </server>

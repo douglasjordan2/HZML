@@ -1,15 +1,17 @@
 <server>
-  const todos = []
+  hzml.db.run("CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, done INTEGER DEFAULT 0)")
 
-  get((request) => {
+  hzml.get((request) => {
+    const todos = hzml.db.query("SELECT id, title, done FROM todos")
     return { todos }
   })
 
-  post((request) => {
+  hzml.post((request) => {
     const title = request.body.title
     if (title) {
-      todos.push({ title, done: false })
+      hzml.db.run("INSERT INTO todos (title) VALUES (?)", [title])
     }
+    const todos = hzml.db.query("SELECT id, title, done FROM todos")
     return { todos }
   })
 </server>
@@ -41,7 +43,7 @@
     `}
   </div>
 
-  <${Swap} id="todo-count">
+  <${Emitter} channel="todo-count">
     ${todos.length > 0 && html`
       <span class="bg-black text-white text-xs rounded-full px-1.5 py-0.5">${todos.length}</span>
     `}

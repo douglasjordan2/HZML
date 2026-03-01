@@ -1,6 +1,6 @@
 <server>
-  get((request) => {
-    return redirect("/about")
+  hzml.get((request) => {
+    return hzml.redirect("/about")
   })
 </server>
 

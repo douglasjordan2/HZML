@@ -42,7 +42,7 @@ A route is a `.hzml` file with an optional `<server>` block and a `<template>` b
 
 ```html
 <server>
-  get((request) => {
+  hzml.get((request) => {
     return {
       title: "Home",
       message: "Hello from HZML.",
@@ -60,19 +60,22 @@ A route is a `.hzml` file with an optional `<server>` block and a `<template>` b
 
 ### Server functions
 
-- **`get(fn)`** — handle GET requests, return data for the template
-- **`post(fn)`** — handle POST requests with `request.body`
-- **`redirect(url)`** — redirect to another route
+Server blocks receive a single `hzml` object with everything injected:
+
+- **`hzml.get(fn)`** — handle GET requests, return data for the template
+- **`hzml.post(fn)`** — handle POST requests with `request.body`
+- **`hzml.redirect(url)`** — redirect to another route
+- **`hzml.db`** — database adapter (SQLite by default)
 
 ```html
 <server>
   const items = []
 
-  get((request) => {
+  hzml.get((request) => {
     return { items }
   })
 
-  post((request) => {
+  hzml.post((request) => {
     items.push(request.body.title)
     return { items }
   })
@@ -85,7 +88,7 @@ Name a file with `$` prefix — `$id.hzml` matches `/blog/anything` and exposes 
 
 ```html
 <server>
-  get((request) => {
+  hzml.get((request) => {
     return { id: request.params.id }
   })
 </server>
@@ -112,7 +115,7 @@ Add `layout.hzml` at any directory level. Layouts nest automatically — a route
 
 Components are `.hzml` files in `components/`. They're globally available in all templates — no imports needed.
 
-Three built-in components ship with the framework: **`Link`**, **`Form`**, and **`Swap`**. The first two exist because of how HTMZ works under the hood.
+Four built-in components ship with the framework: **`Link`**, **`Form`**, **`Emitter`**, and **`Listener`**. The first two exist because of how HTMZ works under the hood.
 
 HTMZ uses a hidden `<iframe name="htmz">` for navigation. When a link or form targets that iframe, the browser loads the response into it. The iframe's `onload` handler finds every element with an ID in the response and replaces the matching element on the page, then updates the URL via `history.pushState`. No client-side JavaScript framework, no fetch calls — just native browser behavior.
 
@@ -133,19 +136,21 @@ For this to work, every `<a>` and `<form>` in your app needs `target="htmz"`. Ra
 <!-- renders as: <form method="post" action="/todos" target="htmz">...</form> -->
 ```
 
-### Swap
+### Emitter / Listener
 
-Because HTMZ replaces elements by matching IDs, a route's response can update any part of the page — not just `#content`. The `Swap` component makes this intent explicit:
+Routes can push content into any part of the page — nav badges, sidebars, footers — using channel-based signals. An `Emitter` produces content, a `Listener` receives it. They're connected by a shared channel name.
 
 ```html
-<${Swap} id="todo-count">
+<!-- in layout.hzml (the receiver) -->
+<${Listener} channel="todo-count" />
+
+<!-- in todos.hzml (the sender) -->
+<${Emitter} channel="todo-count">
   <span class="badge">${todos.length}</span>
 <//>
 ```
 
-When this route responds, the HTMZ handler finds `id="todo-count"` in the response and replaces the matching element wherever it lives on the page — even if it's in the nav, a sidebar, or a completely different layout section. One request, multiple DOM updates, zero JavaScript.
-
-`Swap` renders as a `<span>` with the given ID. The real structure lives inside it.
+On full page loads, the server merges emitter content into matching listeners and strips the emitters from the response. On partial loads (HTMZ navigation), the iframe's `onload` handler does the same merge client-side. Multiple listeners can subscribe to the same channel — no duplicate ID issues.
 
 The `<//>` closing tag is HTM shorthand — it closes the nearest open component.
 
@@ -177,6 +182,53 @@ HZML is opinionated about styling. All CSS is render-blocking — the browser wo
 bun run build          # one-time build
 bun run css:watch      # watch mode
 bun run dev            # server + css watch together
+```
+
+## Database
+
+SQLite is the default database — zero config, zero dependencies on Bun. Available as `hzml.db` in server blocks:
+
+```html
+<server>
+  hzml.db.run("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)")
+
+  hzml.get((request) => {
+    const posts = hzml.db.query("SELECT * FROM posts")
+    return { posts }
+  })
+</server>
+```
+
+Data persists in `data.db` at the project root.
+
+### Custom database
+
+Pass any object that implements `DatabaseAdapter` to use a different database:
+
+```typescript
+import hzml from "./hzml";
+
+hzml({
+  port: 4965,
+  db: {
+    provider: {
+      async query(sql, params) { /* ... */ },
+      async run(sql, params) { /* ... */ },
+      close() { /* ... */ },
+    }
+  }
+});
+```
+
+Async adapters work — route handlers can be async too:
+
+```html
+<server>
+  hzml.get(async (request) => {
+    const posts = await hzml.db.query("SELECT * FROM posts")
+    return { posts }
+  })
+</server>
 ```
 
 ## Runtime

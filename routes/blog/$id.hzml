@@ -1,14 +1,7 @@
 <server>
-  get((request) => {
-    const db = {
-      "1": { title: "Getting Started with HZML", body: "HZML is a minimal web framework built on web primitives." },
-      "2": { title: "Why Server-Side Rendering Matters", body: "SSR delivers content faster and works without JavaScript." },
-      "3": { title: "The Case for Web Primitives", body: "HTMZ, SSE, and tagged templates are all you need." },
-    }
-
-    const post = db[request.params.id]
-    if (!post) return { post: null }
-
+  hzml.get((request) => {
+    const rows = hzml.db.query("SELECT id, title, body FROM posts WHERE id = ?", [request.params.id])
+    const post = rows.length > 0 ? rows[0] : null
     return { post }
   })
 </server>

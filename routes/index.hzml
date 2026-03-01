@@ -1,5 +1,5 @@
 <server>
-  get((request) => {
+  hzml.get((request) => {
     return {
       title: "Home",
       message: "This page is rendered with htm from a get() handler.",
