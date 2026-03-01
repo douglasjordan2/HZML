@@ -8,14 +8,16 @@
 - htm templating with server-side string rendering
 - get()/post() handlers in route scripts
 - Form body parsing
-- .hzml components (Link, Form)
+- .hzml components (Link, Form, Swap)
 - Tailwind CSS build step
 - HTMZ iframe navigation with Sec-Fetch-Dest detection
+- Multi-target element swapping (real HTMZ pattern — any element with a matching ID gets replaced)
+- Swap component for explicit cross-page reactivity
+- Route context caching (server block state persists across requests)
 - Static file serving from public/
 - redirect() works end-to-end (full page + HTMZ iframe, 302 preserves Sec-Fetch-Dest)
 
 ## Next
-- SSE: refresh() for stale sibling updates after POST
 - SSE: stream() for progressive/chunked responses
 - Head tag architecture (per-route title, meta — full page only, title updates on HTMZ nav)
 - SQLite as default database

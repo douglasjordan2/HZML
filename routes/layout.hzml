@@ -1,12 +1,14 @@
 <template>
-  <nav class="flex gap-4 mb-8 pb-4 border-b border-gray-200">
-    <${Link} href="/" class="text-gray-600 font-medium no-underline hover:text-black">Home<//>
-    <${Link} href="/about" class="text-gray-600 font-medium no-underline hover:text-black">About<//>
-    <${Link} href="/todos" class="text-gray-600 font-medium no-underline hover:text-black">Todos<//>
-    <${Link} href="/blog" class="text-gray-600 font-medium no-underline hover:text-black">Blog<//>
-  </nav>
+  <div class="max-w-3xl mx-auto px-6 py-8">
+    <nav class="flex gap-4 mb-8 pb-4 border-b border-gray-200">
+      <${Link} href="/" class="text-gray-600 font-medium no-underline hover:text-black">Home<//>
+      <${Link} href="/about" class="text-gray-600 font-medium no-underline hover:text-black">About<//>
+      <${Link} href="/todos" class="text-gray-600 font-medium no-underline hover:text-black">Todos <span id="todo-count"></span><//>
+      <${Link} href="/blog" class="text-gray-600 font-medium no-underline hover:text-black">Blog<//>
+    </nav>
 
-  <div id="content">
-    ${children}
+    <div id="content">
+      ${children}
+    </div>
   </div>
 </template>

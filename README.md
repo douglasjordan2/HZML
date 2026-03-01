@@ -112,9 +112,9 @@ Add `layout.hzml` at any directory level. Layouts nest automatically — a route
 
 Components are `.hzml` files in `components/`. They're globally available in all templates — no imports needed.
 
-Two built-in components ship with the framework: **`Link`** and **`Form`**. These exist because of how HTMZ works under the hood.
+Three built-in components ship with the framework: **`Link`**, **`Form`**, and **`Swap`**. The first two exist because of how HTMZ works under the hood.
 
-HTMZ uses a hidden `<iframe name="htmz">` for navigation. When a link or form targets that iframe, the browser loads the response into it. The iframe's `onload` handler then swaps the response HTML into the page's `#content` div and updates the URL via `history.pushState`. No client-side JavaScript framework, no fetch calls — just native browser behavior.
+HTMZ uses a hidden `<iframe name="htmz">` for navigation. When a link or form targets that iframe, the browser loads the response into it. The iframe's `onload` handler finds every element with an ID in the response and replaces the matching element on the page, then updates the URL via `history.pushState`. No client-side JavaScript framework, no fetch calls — just native browser behavior.
 
 For this to work, every `<a>` and `<form>` in your app needs `target="htmz"`. Rather than making developers remember that on every element, the built-in components handle it:
 
@@ -132,6 +132,20 @@ For this to work, every `<a>` and `<form>` in your app needs `target="htmz"`. Ra
 
 <!-- renders as: <form method="post" action="/todos" target="htmz">...</form> -->
 ```
+
+### Swap
+
+Because HTMZ replaces elements by matching IDs, a route's response can update any part of the page — not just `#content`. The `Swap` component makes this intent explicit:
+
+```html
+<${Swap} id="todo-count">
+  <span class="badge">${todos.length}</span>
+<//>
+```
+
+When this route responds, the HTMZ handler finds `id="todo-count"` in the response and replaces the matching element wherever it lives on the page — even if it's in the nav, a sidebar, or a completely different layout section. One request, multiple DOM updates, zero JavaScript.
+
+`Swap` renders as a `<span>` with the given ID. The real structure lives inside it.
 
 The `<//>` closing tag is HTM shorthand — it closes the nearest open component.
 

@@ -156,7 +156,7 @@ const shell = (body: string): string => `<!DOCTYPE html>
   ${body}
   <iframe hidden name="htmz" onload="
     if (!contentDocument || !contentDocument.body.childNodes.length) return;
-    document.querySelector('#content').innerHTML = contentDocument.body.innerHTML;
+    [...contentDocument.querySelectorAll('[id]')].map(e => document.getElementById(e.id)?.replaceWith(e));
     history.pushState(null, '', contentWindow.location.pathname);
   "></iframe>
 </body>
@@ -175,7 +175,7 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
   let body: string;
 
   if (route.script) {
-    const data = await executeScript(route.script, request, match.params);
+    const data = await executeScript(route.script, request, match.params, match.filePath);
 
     if (data?.__redirect) {
       return Response.redirect(data.__redirect, 302);
@@ -195,7 +195,7 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
     body = renderTemplate(tmpl, { children: body });
   }
 
-  if (isPartial) return htmlResponse(body);
+  if (isPartial) return htmlResponse(`<div id="content">${body}</div>`);
 
   if (rootLayout) {
     const source = await readFile(rootLayout, "utf-8");

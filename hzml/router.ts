@@ -90,11 +90,16 @@ export async function loadComponents(projectDir?: string): Promise<void> {
   }
 }
 
-export async function executeScript(
-  script: string,
-  request: Request,
-  params: Record<string, string> = {},
-): Promise<Record<string, unknown>> {
+interface RouteContext {
+  getHandler: RouteHandler | null;
+  postHandler: RouteHandler | null;
+}
+
+const routeContexts: Record<string, RouteContext> = {};
+
+function getRouteContext(script: string, filePath: string): RouteContext {
+  if (routeContexts[filePath]) return routeContexts[filePath];
+
   let getHandler: RouteHandler | null = null;
   let postHandler: RouteHandler | null = null;
 
@@ -106,6 +111,19 @@ export async function executeScript(
 
   const register = new Function("get", "post", "redirect", clean);
   register(get, post, redirect);
+
+  const ctx = { getHandler, postHandler };
+  routeContexts[filePath] = ctx;
+  return ctx;
+}
+
+export async function executeScript(
+  script: string,
+  request: Request,
+  params: Record<string, string> = {},
+  filePath: string = "",
+): Promise<Record<string, unknown>> {
+  const { getHandler, postHandler } = getRouteContext(script, filePath);
 
   const method = request.method.toLowerCase();
 
