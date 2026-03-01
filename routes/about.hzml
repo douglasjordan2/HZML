@@ -1,11 +1,11 @@
-<script>
+<server>
   get((request) => {
     return {
       title: "About",
       features: ["htm templating", "HTMZ navigation", "SSE streaming", "Tailwind CSS"],
     }
   })
-</script>
+</server>
 
 <template>
   <div>

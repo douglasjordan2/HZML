@@ -6,7 +6,7 @@ A minimal web framework built on [HTMZ](https://leanrada.com/htmz/) and [HTM](ht
 
 HZML uses a hidden iframe (the HTMZ pattern) for navigation. Links and forms target the iframe, the server decides whether to send a full page or a partial based on the browser's `Sec-Fetch-Dest` header. No custom JavaScript, no virtual DOM, no hydration.
 
-Routes are `.hzml` files with `<script>` and `<template>` blocks. Templates use HTM — tagged template literals that look like JSX but run on the server as plain string concatenation.
+Routes are `.hzml` files with `<server>` and `<template>` blocks. `<server>` is where your server-side code lives (data loading, form handling). `<template>` is what gets rendered to HTML. Need client-side JavaScript? Just use `<script>` inside `<template>` — it passes through as normal HTML.
 
 ## Quick start
 
@@ -15,7 +15,7 @@ bun install
 bun run dev
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:4965`.
 
 ## Project structure
 
@@ -38,17 +38,17 @@ hzml/                 # Framework internals
 
 ## Routes
 
-A route is a `.hzml` file with an optional `<script>` block and a `<template>` block:
+A route is a `.hzml` file with an optional `<server>` block and a `<template>` block:
 
 ```html
-<script>
+<server>
   get((request) => {
     return {
       title: "Home",
       message: "Hello from HZML.",
     }
   })
-</script>
+</server>
 
 <template>
   <div>
@@ -65,7 +65,7 @@ A route is a `.hzml` file with an optional `<script>` block and a `<template>` b
 - **`redirect(url)`** — redirect to another route
 
 ```html
-<script>
+<server>
   const items = []
 
   get((request) => {
@@ -76,7 +76,7 @@ A route is a `.hzml` file with an optional `<script>` block and a `<template>` b
     items.push(request.body.title)
     return { items }
   })
-</script>
+</server>
 ```
 
 ### Dynamic params
@@ -84,11 +84,11 @@ A route is a `.hzml` file with an optional `<script>` block and a `<template>` b
 Name a file with `$` prefix — `$id.hzml` matches `/blog/anything` and exposes `request.params.id`:
 
 ```html
-<script>
+<server>
   get((request) => {
     return { id: request.params.id }
   })
-</script>
+</server>
 
 <template>
   <h1>Post ${id}</h1>

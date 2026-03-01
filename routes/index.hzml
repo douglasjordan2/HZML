@@ -1,11 +1,11 @@
-<script>
+<server>
   get((request) => {
     return {
       title: "Home",
       message: "This page is rendered with htm from a get() handler.",
     }
   })
-</script>
+</server>
 
 <template>
   <div>

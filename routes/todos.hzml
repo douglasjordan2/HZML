@@ -1,4 +1,4 @@
-<script>
+<server>
   const todos = []
 
   get((request) => {
@@ -12,7 +12,7 @@
     }
     return { todos }
   })
-</script>
+</server>
 
 <template>
   <div>

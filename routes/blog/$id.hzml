@@ -1,4 +1,4 @@
-<script>
+<server>
   get((request) => {
     const db = {
       "1": { title: "Getting Started with HZML", body: "HZML is a minimal web framework built on web primitives." },
@@ -11,7 +11,7 @@
 
     return { post }
   })
-</script>
+</server>
 
 <template>
   <div>

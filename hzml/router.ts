@@ -20,7 +20,7 @@ interface ParsedRoute {
 }
 
 export function parseRoute(source: string): ParsedRoute {
-  const scriptMatch = source.match(/<script>([\s\S]*?)<\/script>/);
+  const scriptMatch = source.match(/<server>([\s\S]*?)<\/server>/);
   const templateMatch = source.match(/<template>([\s\S]*?)<\/template>/);
 
   return {

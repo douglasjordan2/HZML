@@ -1,8 +1,8 @@
-<script>
+<server>
   get((request) => {
     return redirect("/about")
   })
-</script>
+</server>
 
 <template>
   <p>You should not see this.</p>
