@@ -112,20 +112,30 @@ Add `layout.hzml` at any directory level. Layouts nest automatically — a route
 
 Components are `.hzml` files in `components/`. They're globally available in all templates — no imports needed.
 
-Two built-in components ship with the framework:
+Two built-in components ship with the framework: **`Link`** and **`Form`**. These exist because of how HTMZ works under the hood.
 
-- **`Link`** — `<a>` that targets the HTMZ iframe
-- **`Form`** — `<form>` that targets the HTMZ iframe
+HTMZ uses a hidden `<iframe name="htmz">` for navigation. When a link or form targets that iframe, the browser loads the response into it. The iframe's `onload` handler then swaps the response HTML into the page's `#content` div and updates the URL via `history.pushState`. No client-side JavaScript framework, no fetch calls — just native browser behavior.
+
+For this to work, every `<a>` and `<form>` in your app needs `target="htmz"`. Rather than making developers remember that on every element, the built-in components handle it:
 
 ```html
 <${Link} href="/about" class="text-blue-600">About<//>
+
+<!-- renders as: <a href="/about" target="htmz" class="text-blue-600">About</a> -->
+```
+
+```html
 <${Form} action="/todos">
   <input type="text" name="title" />
   <button type="submit">Add</button>
 <//>
+
+<!-- renders as: <form method="post" action="/todos" target="htmz">...</form> -->
 ```
 
 The `<//>` closing tag is HTM shorthand — it closes the nearest open component.
+
+You can create your own components by adding `.hzml` files to a `components/` directory in your project root. They follow the same `<template>` format as routes.
 
 ## Templating
 
@@ -147,7 +157,7 @@ ${items.map(item => html`<li>${item}</li>`)}
 
 ## Styling
 
-Tailwind CSS is built-in. Write classes directly in templates. The build step scans `.hzml` files automatically.
+HZML is opinionated about styling. All CSS is render-blocking — the browser won't paint until it finishes parsing every stylesheet and style tag. Scattered CSS makes this worse. Tailwind produces a single, minimal CSS file containing only the classes you actually use, with zero runtime overhead — so it's built in, not optional. Write classes directly in templates. The build step scans `.hzml` files automatically.
 
 ```bash
 bun run build          # one-time build

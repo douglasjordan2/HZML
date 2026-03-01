@@ -18,7 +18,8 @@
 - SSE: stream() for progressive/chunked responses
 - Head tag architecture (per-route title, meta — full page only, title updates on HTMZ nav)
 - redirect() verified end-to-end in browser
-- Plugin system for $db and other injected modules (dougless.config.js)
+- SQLite as default database
+- Plugin system for injected modules (hzml.config.js)
 - Import resolution in script blocks (currently stripped)
 
 ## Future
