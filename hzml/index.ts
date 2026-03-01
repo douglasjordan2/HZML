@@ -2,7 +2,7 @@ import { resolve } from "path";
 import { loadComponents } from "./router";
 import { createHandler } from "./handler";
 
-export default async function hzml(port: number = 3000) {
+export default async function hzml(port: number = 4965) {
   const projectDir = process.cwd();
   const routesDir = resolve(projectDir, "routes");
   const publicDir = resolve(projectDir, "public");

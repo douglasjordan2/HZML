@@ -171,7 +171,7 @@ HZML uses web-standard `Request`/`Response` APIs. The entry point is runtime-agn
 
 ```typescript
 import hzml from "./hzml";
-hzml(3000);
+hzml(4965);
 ```
 
 Works with Bun, Deno, and Node.js.
