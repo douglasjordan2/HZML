@@ -1,3 +1,5 @@
 import hzml from "./hzml";
 
-hzml(3000);
+const port = Number(process.env.PORT) || 4965;
+
+hzml(port);
