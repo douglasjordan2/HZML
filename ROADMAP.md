@@ -30,6 +30,7 @@
 - npx create-hzml scaffolding (generates starter routes, layout, app.css, index.ts)
 - CLI commands (hzml dev, hzml build, hzml start)
 - Resolve import.meta.dirname to work from node_modules
+- Create documentation website using HZML
 
 ## Future
 - Scoped component loading (opt-in per-route imports if global injection becomes a scaling problem)
