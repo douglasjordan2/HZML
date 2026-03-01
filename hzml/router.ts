@@ -70,7 +70,7 @@ async function loadFromDir(dir: string) {
       if (Array.isArray(data.children)) {
         data.children = (data.children as unknown[])
           .flat(Infinity)
-          .filter((c: unknown) => c != null && c !== false)
+          .filter((c: unknown) => c != null && typeof c !== "boolean")
           .join("");
       }
 

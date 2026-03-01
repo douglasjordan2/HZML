@@ -18,7 +18,7 @@ function h(type: string | ComponentFn, props: Record<string, PropValue> | null, 
 
   const inner = children
     .flat(Infinity)
-    .map((c) => (c == null || c === false ? "" : String(c)))
+    .map((c) => (c == null || typeof c === "boolean" ? "" : String(c)))
     .join("");
 
   if (VOID_TAGS.has(type)) {
