@@ -168,8 +168,7 @@ Works with Bun, Deno, and Node.js.
 
 ## Dependencies
 
-Three production dependencies:
-
+- [HTMZ](https://github.com/Kalabasa/htmz) — the world's greatest reactive framework, and the main inspiration for this project. One hidden iframe, zero JavaScript.
 - [HTM](https://github.com/developit/htm) (~500 bytes) — tagged template literals
 - [tailwindcss](https://tailwindcss.com) — utility CSS
 - [@tailwindcss/cli](https://tailwindcss.com) — CSS build step

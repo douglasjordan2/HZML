@@ -17,17 +17,17 @@ function h(type: any, props: Record<string, any> | null, ...children: any[]): st
     .map((c) => (c == null || c === false ? "" : String(c)))
     .join("");
 
-  const voidTags = new Set([
-    "area", "base", "br", "col", "embed", "hr",
-    "img", "input", "link", "meta", "source", "track", "wbr",
-  ]);
-
-  if (voidTags.has(type)) {
+  if (VOID_TAGS.has(type)) {
     return `<${type}${attrs}>`;
   }
 
   return `<${type}${attrs}>${inner}</${type}>`;
 }
+
+const VOID_TAGS = new Set([
+  "area", "base", "br", "col", "embed", "hr",
+  "img", "input", "link", "meta", "source", "track", "wbr",
+]);
 
 const _html = htm.bind(h);
 

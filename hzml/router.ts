@@ -70,16 +70,14 @@ async function loadFromDir(dir: string) {
 
 }
 
-export async function loadComponents(projectDir?: string): Promise<Record<string, Function>> {
-  if (Object.keys(componentCache).length > 0) return componentCache;
+export async function loadComponents(projectDir?: string): Promise<void> {
+  if (Object.keys(componentCache).length > 0) return;
 
   await loadFromDir(BUILT_IN_COMPONENTS);
 
   if (projectDir) {
     await loadFromDir(join(projectDir, "components"));
   }
-
-  return componentCache;
 }
 
 export async function executeScript(

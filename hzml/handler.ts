@@ -47,6 +47,13 @@ async function findDynamic(dir: string, type: "file" | "dir"): Promise<{ name: s
   return null;
 }
 
+async function collectLayouts(dir: string, layouts: string[]): Promise<string[]> {
+  const copy = [...layouts];
+  const layout = join(dir, "layout.hzml");
+  if (await fileExists(layout)) copy.push(layout);
+  return copy;
+}
+
 interface RouteMatch {
   filePath: string;
   params: Record<string, string>;
@@ -97,10 +104,7 @@ async function walk(
 
     const subDir = join(dir, segment);
     if (await isDirectory(subDir)) {
-      const subLayouts = [...layouts];
-      const subLayout = join(subDir, "layout.hzml");
-      if (await fileExists(subLayout)) subLayouts.push(subLayout);
-
+      const subLayouts = await collectLayouts(subDir, layouts);
       const indexFile = join(subDir, "index.hzml");
       if (await fileExists(indexFile)) {
         return { filePath: indexFile, params: { ...params }, layouts: subLayouts };
@@ -110,10 +114,7 @@ async function walk(
     const dynamicDir = await findDynamic(dir, "dir");
     if (dynamicDir) {
       const paramName = dynamicDir.name.slice(1);
-      const subLayouts = [...layouts];
-      const subLayout = join(dynamicDir.path, "layout.hzml");
-      if (await fileExists(subLayout)) subLayouts.push(subLayout);
-
+      const subLayouts = await collectLayouts(dynamicDir.path, layouts);
       const indexFile = join(dynamicDir.path, "index.hzml");
       if (await fileExists(indexFile)) {
         return {
@@ -129,32 +130,27 @@ async function walk(
 
   const subDir = join(dir, segment);
   if (await isDirectory(subDir)) {
-    const subLayouts = [...layouts];
-    const subLayout = join(subDir, "layout.hzml");
-    if (await fileExists(subLayout)) subLayouts.push(subLayout);
+    const subLayouts = await collectLayouts(subDir, layouts);
     return walk(remaining, subDir, { ...params }, subLayouts);
   }
 
   const dynamicDir = await findDynamic(dir, "dir");
   if (dynamicDir) {
     const paramName = dynamicDir.name.slice(1);
-    const subLayouts = [...layouts];
-    const subLayout = join(dynamicDir.path, "layout.hzml");
-    if (await fileExists(subLayout)) subLayouts.push(subLayout);
+    const subLayouts = await collectLayouts(dynamicDir.path, layouts);
     return walk(remaining, dynamicDir.path, { ...params, [paramName]: segment }, subLayouts);
   }
 
   return null;
 }
 
-const shell = (head: string, body: string): string => `<!DOCTYPE html>
+const shell = (body: string): string => `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HZML</title>
   <link rel="stylesheet" href="/app.css">
-  ${head}
 </head>
 <body>
   ${body}
@@ -187,7 +183,7 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
 
     body = route.template ? renderTemplate(route.template, data) : "";
   } else {
-    body = source;
+    body = route.template ? renderTemplate(route.template, {}) : source;
   }
 
   const [rootLayout, ...nestedLayouts] = match.layouts;
@@ -208,7 +204,7 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
     body = renderTemplate(tmpl, { children: body });
   }
 
-  return htmlResponse(shell("", body));
+  return htmlResponse(shell(body));
 }
 
 return async function handler(req: Request): Promise<Response> {
