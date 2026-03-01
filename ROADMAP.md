@@ -42,3 +42,4 @@
 - Document event delegation pattern for client interactivity
 - Web component integration for stateful client-side components
 - Middleware (auth, logging, etc.)
+- Complex form validation with Zod and other providers
