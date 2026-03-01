@@ -12,12 +12,12 @@
 - Tailwind CSS build step
 - HTMZ iframe navigation with Sec-Fetch-Dest detection
 - Static file serving from public/
+- redirect() works end-to-end (full page + HTMZ iframe, 302 preserves Sec-Fetch-Dest)
 
 ## Next
 - SSE: refresh() for stale sibling updates after POST
 - SSE: stream() for progressive/chunked responses
 - Head tag architecture (per-route title, meta — full page only, title updates on HTMZ nav)
-- redirect() verified end-to-end in browser
 - SQLite as default database
 - Plugin system for injected modules (hzml.config.js)
 - Import resolution in script blocks (currently stripped)
@@ -35,7 +35,6 @@
 - Error boundaries (what renders when a script throws?)
 - 404/500 route files
 - Hot reload in dev mode
-- npx create-hzml scaffolding
 - Production build (single binary via bun build --compile or deno compile)
 - Document event delegation pattern for client interactivity
 - Web component integration for stateful client-side components

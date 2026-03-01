@@ -1,0 +1,9 @@
+<script>
+  get((request) => {
+    return redirect("/about")
+  })
+</script>
+
+<template>
+  <p>You should not see this.</p>
+</template>
