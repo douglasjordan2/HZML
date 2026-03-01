@@ -1,0 +1,22 @@
+{
+  "name": "hzml",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run css:watch & bun --watch index.ts",
+    "build": "bunx @tailwindcss/cli -i app.css -o public/app.css --minify",
+    "css:watch": "bunx @tailwindcss/cli -i app.css -o public/app.css --watch"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@tailwindcss/cli": "^4.2.1",
+    "htm": "^3.1.1",
+    "tailwindcss": "^4.2.1"
+  }
+}

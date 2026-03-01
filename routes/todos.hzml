@@ -1,0 +1,43 @@
+<script>
+  const todos = []
+
+  get((request) => {
+    return { todos }
+  })
+
+  post((request) => {
+    const title = request.body.title
+    if (title) {
+      todos.push({ title, done: false })
+    }
+    return { todos }
+  })
+</script>
+
+<template>
+  <div>
+    <h1 class="text-3xl font-bold mb-4">Todos</h1>
+
+    <${Form} action="/todos" class="flex gap-2 mb-6">
+      <input
+        type="text"
+        name="title"
+        placeholder="Add a todo..."
+        class="border rounded px-3 py-2 flex-1"
+      />
+      <button type="submit" class="bg-black text-white px-4 py-2 rounded">
+        Add
+      </button>
+    <//>
+
+    <ul class="space-y-2">
+      ${todos.map(todo => html`
+        <li class="text-gray-700 px-3 py-2 bg-gray-50 rounded">${todo.title}</li>
+      `)}
+    </ul>
+
+    ${todos.length === 0 && html`
+      <p class="text-gray-400 italic">No todos yet.</p>
+    `}
+  </div>
+</template>

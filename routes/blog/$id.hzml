@@ -1,0 +1,27 @@
+<script>
+  get((request) => {
+    const db = {
+      "1": { title: "Getting Started with HZML", body: "HZML is a minimal web framework built on web primitives." },
+      "2": { title: "Why Server-Side Rendering Matters", body: "SSR delivers content faster and works without JavaScript." },
+      "3": { title: "The Case for Web Primitives", body: "HTMZ, SSE, and tagged templates are all you need." },
+    }
+
+    const post = db[request.params.id]
+    if (!post) return { post: null }
+
+    return { post }
+  })
+</script>
+
+<template>
+  <div>
+    ${post
+      ? html`
+        <${Link} href="/blog" class="text-sm text-gray-500 hover:text-black mb-4 block">← Back to posts<//>
+        <h1 class="text-3xl font-bold mb-4">${post.title}</h1>
+        <p class="text-gray-700 leading-relaxed">${post.body}</p>
+      `
+      : html`<p class="text-gray-500">Post not found.</p>`
+    }
+  </div>
+</template>

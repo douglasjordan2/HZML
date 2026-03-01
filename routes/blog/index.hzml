@@ -1,0 +1,25 @@
+<script>
+  get((request) => {
+    const posts = [
+      { id: "1", title: "Getting Started with HZML" },
+      { id: "2", title: "Why Server-Side Rendering Matters" },
+      { id: "3", title: "The Case for Web Primitives" },
+    ]
+    return { posts }
+  })
+</script>
+
+<template>
+  <div>
+    <h1 class="text-3xl font-bold mb-4">Blog</h1>
+    <ul class="space-y-3">
+      ${posts.map(post => html`
+        <li>
+          <${Link} href="/blog/${post.id}" class="text-blue-600 hover:underline text-lg">
+            ${post.title}
+          <//>
+        </li>
+      `)}
+    </ul>
+  </div>
+</template>

@@ -1,0 +1,15 @@
+<script>
+  get((request) => {
+    return {
+      title: "Home",
+      message: "This page is rendered with htm from a get() handler.",
+    }
+  })
+</script>
+
+<template>
+  <div>
+    <h1 class="text-3xl font-bold mb-2">${title}</h1>
+    <p class="text-gray-600">${message}</p>
+  </div>
+</template>

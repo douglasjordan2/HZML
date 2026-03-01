@@ -1,0 +1,3 @@
+<template>
+  <a href="${href}" target="htmz" class="${cls || ''}">${children}</a>
+</template>

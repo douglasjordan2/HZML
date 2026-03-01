@@ -1,0 +1,3 @@
+<template>
+  <form method="${method || 'post'}" action="${action}" target="htmz" class="${cls || ''}">${children}</form>
+</template>

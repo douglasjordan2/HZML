@@ -1,0 +1,34 @@
+# HZML Roadmap
+
+## Done
+- Runtime-agnostic handler (Bun/Deno/Node)
+- File-based routing with nested directories
+- Dynamic params ($id)
+- Nested layouts (layout.hzml at any level)
+- htm templating with server-side string rendering
+- get()/post() handlers in route scripts
+- Form body parsing
+- .hzml components (Link, Form)
+- Tailwind CSS build step
+- HTMZ iframe navigation with Sec-Fetch-Dest detection
+- Static file serving from public/
+
+## Next
+- SSE: refresh() for stale sibling updates after POST
+- SSE: stream() for progressive/chunked responses
+- Head tag architecture (per-route title, meta — full page only, title updates on HTMZ nav)
+- redirect() verified end-to-end in browser
+- Plugin system for $db and other injected modules (dougless.config.js)
+- Import resolution in script blocks (currently stripped)
+
+## Future
+- Scoped component loading (opt-in per-route imports if global injection becomes a scaling problem)
+- URL param support on request object (query strings)
+- Error boundaries (what renders when a script throws?)
+- 404/500 route files
+- Hot reload in dev mode
+- npx create-hzml scaffolding
+- Production build (single binary via bun build --compile or deno compile)
+- Document event delegation pattern for client interactivity
+- Web component integration for stateful client-side components
+- Middleware (auth, logging, etc.)

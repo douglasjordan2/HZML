@@ -1,0 +1,17 @@
+<script>
+  get((request) => {
+    return {
+      title: "About",
+      features: ["htm templating", "HTMZ navigation", "SSE streaming", "Tailwind CSS"],
+    }
+  })
+</script>
+
+<template>
+  <div>
+    <h1 class="text-3xl font-bold mb-4">${title}</h1>
+    <ul class="space-y-2">
+      ${features.map(f => html`<li class="text-gray-600">— ${f}</li>`)}
+    </ul>
+  </div>
+</template>
