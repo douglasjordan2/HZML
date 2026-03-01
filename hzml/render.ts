@@ -1,6 +1,10 @@
 import htm from "htm";
 
-function h(type: any, props: Record<string, any> | null, ...children: any[]): string {
+type ComponentFn = (props: Record<string, unknown>) => string;
+type HtmlChild = string | number | boolean | null | undefined | HtmlChild[];
+type PropValue = string | number | boolean | null | undefined;
+
+function h(type: string | ComponentFn, props: Record<string, PropValue> | null, ...children: HtmlChild[]): string {
   if (typeof type === "function") {
     return type({ ...props, children: children.flat() });
   }
@@ -31,7 +35,7 @@ const VOID_TAGS = new Set([
 
 const _html = htm.bind(h);
 
-export function html(strings: TemplateStringsArray, ...values: any[]): string {
+export function html(strings: TemplateStringsArray, ...values: unknown[]): string {
   const result = _html(strings, ...values);
   return Array.isArray(result) ? result.join("") : result;
 }

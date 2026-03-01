@@ -4,6 +4,16 @@ import { html } from "./render";
 
 const BUILT_IN_COMPONENTS = join(import.meta.dirname ?? import.meta.dir, "components");
 
+type ComponentFn = (props: Record<string, unknown>) => string;
+type RouteHandler = (req: HzmlRequest) => Record<string, unknown>;
+
+interface HzmlRequest {
+  method: string;
+  headers: Headers;
+  params: Record<string, string>;
+  body?: Record<string, FormDataEntryValue>;
+}
+
 interface ParsedRoute {
   script: string;
   template: string;
@@ -19,7 +29,7 @@ export function parseRoute(source: string): ParsedRoute {
   };
 }
 
-const componentCache: Record<string, Function> = {};
+const componentCache: Record<string, ComponentFn> = {};
 
 async function loadFromDir(dir: string) {
   let entries;
@@ -43,8 +53,8 @@ async function loadFromDir(dir: string) {
 
     const tmpl = parsed.template;
 
-    componentCache[name] = (props: any) => {
-      const data: Record<string, any> = {};
+    componentCache[name] = (props: Record<string, unknown>) => {
+      const data: Record<string, unknown> = {};
 
       for (const v of templateVars) {
         data[v] = undefined;
@@ -58,9 +68,9 @@ async function loadFromDir(dir: string) {
       }
 
       if (Array.isArray(data.children)) {
-        data.children = data.children
+        data.children = (data.children as unknown[])
           .flat(Infinity)
-          .filter((c: any) => c != null && c !== false)
+          .filter((c: unknown) => c != null && c !== false)
           .join("");
       }
 
@@ -84,12 +94,12 @@ export async function executeScript(
   script: string,
   request: Request,
   params: Record<string, string> = {},
-): Promise<Record<string, any>> {
-  let getHandler: Function | null = null;
-  let postHandler: Function | null = null;
+): Promise<Record<string, unknown>> {
+  let getHandler: RouteHandler | null = null;
+  let postHandler: RouteHandler | null = null;
 
-  const get = (fn: Function) => { getHandler = fn; };
-  const post = (fn: Function) => { postHandler = fn; };
+  const get = (fn: RouteHandler) => { getHandler = fn; };
+  const post = (fn: RouteHandler) => { postHandler = fn; };
   const redirect = (url: string) => ({ __redirect: url });
 
   const clean = script.replace(/^import\s.*$/gm, "");
@@ -99,7 +109,7 @@ export async function executeScript(
 
   const method = request.method.toLowerCase();
 
-  const req: Record<string, any> = { method, headers: request.headers, params };
+  const req: HzmlRequest = { method, headers: request.headers, params };
 
   if (method === "post" && postHandler) {
     const formData = await request.formData();
@@ -114,7 +124,7 @@ export async function executeScript(
 
 export function renderTemplate(
   template: string,
-  data: Record<string, any>,
+  data: Record<string, unknown>,
 ): string {
   if (!template) return "";
 
