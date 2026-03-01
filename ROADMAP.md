@@ -22,6 +22,13 @@
 - Plugin system for injected modules (hzml.config.js)
 - Import resolution in script blocks (currently stripped)
 
+## Package as a real framework
+- Separate framework from demo (move routes/, public/, app.css, index.ts into examples/)
+- Publish hzml/ as an npm package
+- npx create-hzml scaffolding (generates starter routes, layout, app.css, index.ts)
+- CLI commands (hzml dev, hzml build, hzml start)
+- Resolve import.meta.dirname to work from node_modules
+
 ## Future
 - Scoped component loading (opt-in per-route imports if global injection becomes a scaling problem)
 - URL param support on request object (query strings)
