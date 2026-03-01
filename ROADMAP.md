@@ -8,19 +8,21 @@
 - htm templating with server-side string rendering
 - get()/post() handlers in route scripts
 - Form body parsing
-- .hzml components (Link, Form, Swap)
+- .hzml components (Link, Form, Emitter, Listener)
 - Tailwind CSS build step
 - HTMZ iframe navigation with Sec-Fetch-Dest detection
 - Multi-target element swapping (real HTMZ pattern — any element with a matching ID gets replaced)
-- Swap component for explicit cross-page reactivity
+- Emitter/Listener channels for cross-page reactivity (replaces Swap — no duplicate IDs, multiple listeners per channel)
 - Route context caching (server block state persists across requests)
 - Static file serving from public/
 - redirect() works end-to-end (full page + HTMZ iframe, 302 preserves Sec-Fetch-Dest)
+- hzml.* namespace injection (single object replaces separate get/post/redirect args)
+- SQLite as default database (bun:sqlite, zero dependencies)
+- DatabaseAdapter interface for custom providers (async-capable)
 
 ## Next
-- SSE: stream() for progressive/chunked responses
+- SSE / streaming: deferred data with resolveData seam (Remix-style defer pattern)
 - Head tag architecture (per-route title, meta — full page only, title updates on HTMZ nav)
-- SQLite as default database
 - Plugin system for injected modules (hzml.config.js)
 - Import resolution in script blocks (currently stripped)
 

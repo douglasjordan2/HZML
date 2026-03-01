@@ -1,6 +1,7 @@
 import { join, extname } from "path";
 import { readFile, access, readdir, stat } from "fs/promises";
 import { parseRoute, executeScript, renderTemplate } from "./router";
+import type { DatabaseAdapter } from "./db";
 
 const MIME_TYPES: Record<string, string> = {
   ".css": "text/css",
@@ -11,7 +12,7 @@ const MIME_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-export function createHandler(routesDir: string, publicDir: string) {
+export function createHandler(routesDir: string, publicDir: string, db?: DatabaseAdapter) {
 
 async function fileExists(path: string): Promise<boolean> {
   try {
@@ -157,10 +158,62 @@ const shell = (body: string): string => `<!DOCTYPE html>
   <iframe hidden name="htmz" onload="
     if (!contentDocument || !contentDocument.body.childNodes.length) return;
     [...contentDocument.querySelectorAll('[id]')].map(e => document.getElementById(e.id)?.replaceWith(e));
+    document.querySelectorAll('[data-emit]').forEach(e => document.querySelectorAll('[data-listen=&quot;'+e.dataset.emit+'&quot;]').forEach(t => t.innerHTML = e.innerHTML));
     history.pushState(null, '', contentWindow.location.pathname);
   "></iframe>
 </body>
 </html>`;
+
+async function resolveData(data: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const entries = Object.entries(data);
+  const resolved = await Promise.all(
+    entries.map(async ([k, v]) => [k, v instanceof Promise ? await v : v])
+  );
+  return Object.fromEntries(resolved);
+}
+
+function mergeChannels(body: string): string {
+  const emitterRe = /<span data-emit="([^"]+)" hidden>/g;
+  const emitters: Record<string, string> = {};
+  const ranges: [number, number][] = [];
+  let match;
+
+  while ((match = emitterRe.exec(body)) !== null) {
+    const channel = match[1];
+    const outerStart = match.index;
+    const innerStart = outerStart + match[0].length;
+    let depth = 1, i = innerStart;
+
+    while (i < body.length && depth > 0) {
+      if (body.startsWith('</span>', i)) {
+        depth--;
+        if (depth === 0) {
+          emitters[channel] = body.slice(innerStart, i).trim();
+          ranges.push([outerStart, i + 7]);
+          emitterRe.lastIndex = i + 7;
+          break;
+        }
+        i += 7;
+      } else if (body[i] === '<' && body.startsWith('<span', i) &&
+                 (body[i + 5] === ' ' || body[i + 5] === '>' || body[i + 5] === '/')) {
+        depth++;
+        i += 5;
+      } else {
+        i++;
+      }
+    }
+  }
+
+  let result = body;
+  for (let j = ranges.length - 1; j >= 0; j--) {
+    result = result.slice(0, ranges[j][0]) + result.slice(ranges[j][1]);
+  }
+
+  return result.replace(
+    /<span data-listen="([^"]+)"><\/span>/g,
+    (m, ch) => ch in emitters ? `<span data-listen="${ch}">${emitters[ch]}</span>` : m
+  );
+}
 
 function htmlResponse(body: string): Response {
   return new Response(body, {
@@ -175,12 +228,13 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
   let body: string;
 
   if (route.script) {
-    const data = await executeScript(route.script, request, match.params, match.filePath);
+    const raw = await executeScript(route.script, request, match.params, match.filePath, db);
 
-    if (data?.__redirect) {
-      return Response.redirect(data.__redirect, 302);
+    if (raw?.__redirect) {
+      return Response.redirect(raw.__redirect, 302);
     }
 
+    const data = await resolveData(raw);
     body = route.template ? renderTemplate(route.template, data) : "";
   } else {
     body = route.template ? renderTemplate(route.template, {}) : source;
@@ -202,6 +256,7 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
     const layout = parseRoute(source);
     const tmpl = layout.template || source;
     body = renderTemplate(tmpl, { children: body });
+    body = mergeChannels(body);
   }
 
   return htmlResponse(shell(body));

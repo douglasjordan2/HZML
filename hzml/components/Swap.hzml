@@ -1,3 +1,0 @@
-<template>
-  <span id="${id}">${children}</span>
-</template>

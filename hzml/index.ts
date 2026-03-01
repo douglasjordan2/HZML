@@ -1,15 +1,31 @@
 import { resolve } from "path";
 import { loadComponents } from "./router";
 import { createHandler } from "./handler";
+import { createSQLiteAdapter, type DatabaseAdapter } from "./db";
 
-export default async function hzml(port: number = 4965) {
+interface HzmlOptions {
+  port?: number;
+  db?: { provider?: DatabaseAdapter | "sqlite"; path?: string };
+}
+
+export default async function hzml(options: number | HzmlOptions = 4965) {
+  const port = typeof options === "number" ? options : (options.port ?? 4965);
+  const dbConfig = typeof options === "number" ? undefined : options.db;
+
+  let db: DatabaseAdapter | undefined;
+  if (dbConfig?.provider && typeof dbConfig.provider !== "string") {
+    db = dbConfig.provider;
+  } else {
+    db = createSQLiteAdapter(dbConfig?.path ?? "./data.db");
+  }
+
   const projectDir = process.cwd();
   const routesDir = resolve(projectDir, "routes");
   const publicDir = resolve(projectDir, "public");
 
   await loadComponents(projectDir);
 
-  const handler = createHandler(routesDir, publicDir);
+  const handler = createHandler(routesDir, publicDir, db);
 
   if (globalThis.Bun) {
     Bun.serve({ port, fetch: handler });

@@ -1,11 +1,12 @@
 import { join, basename } from "path";
 import { readdir, readFile } from "fs/promises";
 import { html } from "./render";
+import type { DatabaseAdapter } from "./db";
 
 const BUILT_IN_COMPONENTS = join(import.meta.dirname ?? import.meta.dir, "components");
 
 type ComponentFn = (props: Record<string, unknown>) => string;
-type RouteHandler = (req: HzmlRequest) => Record<string, unknown>;
+type RouteHandler = (req: HzmlRequest) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
 interface HzmlRequest {
   method: string;
@@ -97,7 +98,7 @@ interface RouteContext {
 
 const routeContexts: Record<string, RouteContext> = {};
 
-function getRouteContext(script: string, filePath: string): RouteContext {
+function getRouteContext(script: string, filePath: string, db?: DatabaseAdapter): RouteContext {
   if (routeContexts[filePath]) return routeContexts[filePath];
 
   let getHandler: RouteHandler | null = null;
@@ -109,8 +110,9 @@ function getRouteContext(script: string, filePath: string): RouteContext {
 
   const clean = script.replace(/^import\s.*$/gm, "");
 
-  const register = new Function("get", "post", "redirect", clean);
-  register(get, post, redirect);
+  const hzml = { get, post, redirect, db };
+  const register = new Function("hzml", clean);
+  register(hzml);
 
   const ctx = { getHandler, postHandler };
   routeContexts[filePath] = ctx;
@@ -122,8 +124,9 @@ export async function executeScript(
   request: Request,
   params: Record<string, string> = {},
   filePath: string = "",
+  db?: DatabaseAdapter,
 ): Promise<Record<string, unknown>> {
-  const { getHandler, postHandler } = getRouteContext(script, filePath);
+  const { getHandler, postHandler } = getRouteContext(script, filePath, db);
 
   const method = request.method.toLowerCase();
 
@@ -132,10 +135,10 @@ export async function executeScript(
   if (method === "post" && postHandler) {
     const formData = await request.formData();
     req.body = Object.fromEntries(formData);
-    return postHandler(req);
+    return await postHandler(req);
   }
 
-  if (method === "get" && getHandler) return getHandler(req);
+  if (method === "get" && getHandler) return await getHandler(req);
 
   return {};
 }

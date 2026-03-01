@@ -1,9 +1,17 @@
 <server>
-  get((request) => {
-    return {
-      title: "About",
-      features: ["htm templating", "HTMZ navigation", "SSE streaming", "Tailwind CSS"],
-    }
+  hzml.db.run("CREATE TABLE IF NOT EXISTS features (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+
+  const seed = hzml.db.query("SELECT COUNT(*) as count FROM features")
+  if (seed[0].count === 0) {
+    hzml.db.run("INSERT INTO features (name) VALUES (?)", ["htm templating"])
+    hzml.db.run("INSERT INTO features (name) VALUES (?)", ["HTMZ navigation"])
+    hzml.db.run("INSERT INTO features (name) VALUES (?)", ["SQLite database"])
+    hzml.db.run("INSERT INTO features (name) VALUES (?)", ["Tailwind CSS"])
+  }
+
+  hzml.get((request) => {
+    const features = hzml.db.query("SELECT name FROM features")
+    return { title: "About", features }
   })
 </server>
 
@@ -11,7 +19,7 @@
   <div>
     <h1 class="text-3xl font-bold mb-4">${title}</h1>
     <ul class="space-y-2">
-      ${features.map(f => html`<li class="text-gray-600">— ${f}</li>`)}
+      ${features.map(f => html`<li class="text-gray-600">— ${f.name}</li>`)}
     </ul>
   </div>
 </template>
