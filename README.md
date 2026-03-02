@@ -1,6 +1,6 @@
 # HZML
 
-A minimal web framework built on [HTMZ](https://leanrada.com/htmz/) and [HTM](https://github.com/developit/htm). Server-rendered HTML with SPA-like navigation using web primitives — no client-side JavaScript framework required.
+A micrometaframework built on [HTMZ](https://leanrada.com/htmz/) and [HTM](https://github.com/developit/htm). Server-rendered HTML with client-side reactivity using web primitives — no client-side Javascript framework required.
 
 ## How it works
 
