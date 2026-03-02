@@ -33,3 +33,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# tree-sitter build artifacts
+tree-sitter-hzml/src/parser.c
+tree-sitter-hzml/src/tree_sitter/
+tree-sitter-hzml/src/grammar.json
+tree-sitter-hzml/src/node-types.json
+tree-sitter-hzml/parser/
+tree-sitter-hzml/node_modules

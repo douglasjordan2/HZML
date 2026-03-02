@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "version": "0.1.0",
+    "language": "hzml"
+  },
+  "grammars": [
+    {
+      "name": "hzml",
+      "scope": "source.hzml",
+      "path": ".",
+      "file-types": ["hzml"],
+      "highlights": "queries/hzml/highlights.scm",
+      "injections": "queries/hzml/injections.scm"
+    }
+  ]
+}

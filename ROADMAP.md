@@ -19,12 +19,14 @@
 - hzml.* namespace injection (single object replaces separate get/post/redirect args)
 - SQLite as default database (bun:sqlite, zero dependencies)
 - DatabaseAdapter interface for custom providers (async-capable)
+- Tree-sitter grammar for .hzml syntax highlighting (Neovim — block boundaries + TypeScript/HTML injection)
 
 ## Next
 - SSE / streaming: deferred data with resolveData seam (Remix-style defer pattern)
 - Head tag architecture (per-route title, meta — full page only, title updates on HTMZ nav)
 - Plugin system for injected modules (hzml.config.js)
 - Import resolution in script blocks (currently stripped)
+- Tree-sitter v2: custom template parsing for HTM syntax (${expr}, <${Component}>, <//> highlighting)
 
 ## Package as a real framework
 - Separate framework from demo (move routes/, public/, app.css, index.ts into examples/)

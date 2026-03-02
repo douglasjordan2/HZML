@@ -1,0 +1,19 @@
+{
+  "name": "tree-sitter-hzml",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for HZML",
+  "main": "grammar.js",
+  "scripts": {
+    "build": "tree-sitter generate && tree-sitter build",
+    "test": "tree-sitter test",
+    "parse": "tree-sitter parse"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.hzml",
+      "file-types": ["hzml"],
+      "highlights": "queries/hzml/highlights.scm",
+      "injections": "queries/hzml/injections.scm"
+    }
+  ]
+}

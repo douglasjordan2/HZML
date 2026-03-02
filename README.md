@@ -242,6 +242,46 @@ hzml(4965);
 
 Works with Bun, Deno, and Node.js.
 
+## Editor support
+
+HZML includes a [Tree-sitter](https://tree-sitter.github.io/) grammar for syntax highlighting. Tree-sitter is built into Neovim — it parses `.hzml` files into a syntax tree and uses language injection to delegate TypeScript highlighting to `<server>` blocks and HTML highlighting to `<template>` blocks. No build step, no TextMate regexes — just a real parser.
+
+No VS Code extension yet. Tree-sitter gives us precise, context-aware highlighting with the right level of complexity for an opinionated framework. If someone wants to build a TextMate grammar or VS Code extension, PRs welcome.
+
+### Neovim setup
+
+Requires [`tree-sitter-cli`](https://github.com/tree-sitter/tree-sitter/blob/master/cli/README.md) and a C compiler.
+
+```bash
+cd tree-sitter-hzml
+tree-sitter generate
+tree-sitter build --output parser/hzml.so
+```
+
+Copy the built parser and queries to your Neovim runtimepath:
+
+```bash
+mkdir -p ~/.local/share/nvim/site/parser
+cp parser/hzml.so ~/.local/share/nvim/site/parser/
+
+mkdir -p ~/.local/share/nvim/site/queries/hzml
+cp queries/hzml/* ~/.local/share/nvim/site/queries/hzml/
+
+mkdir -p ~/.config/nvim/ftdetect
+cp ftdetect/hzml.lua ~/.config/nvim/ftdetect/
+```
+
+Add to your Neovim config:
+
+```lua
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "hzml",
+  callback = function(args)
+    pcall(vim.treesitter.start, args.buf, "hzml")
+  end,
+})
+```
+
 ## Dependencies
 
 - [HTMZ](https://github.com/Kalabasa/htmz) — the world's greatest reactive framework, and the main inspiration for this project. One hidden iframe, zero JavaScript.

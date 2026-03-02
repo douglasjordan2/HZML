@@ -1,0 +1,98 @@
+================
+Server and template blocks
+================
+
+<server>
+  hzml.get((request) => {
+    return { title: "Home" }
+  })
+</server>
+
+<template>
+  <h1>${title}</h1>
+</template>
+
+---
+
+(source_file
+  (server_block
+    (server_content))
+  (template_block
+    (template_content)))
+
+================
+Template only
+================
+
+<template>
+  <p>Hello world</p>
+</template>
+
+---
+
+(source_file
+  (template_block
+    (template_content)))
+
+================
+Server only
+================
+
+<server>
+  hzml.db.run("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)")
+</server>
+
+---
+
+(source_file
+  (server_block
+    (server_content)))
+
+================
+Template with HTML closing tags
+================
+
+<template>
+  <div class="container">
+    <h1>Title</h1>
+    <p>Paragraph</p>
+  </div>
+</template>
+
+---
+
+(source_file
+  (template_block
+    (template_content)))
+
+================
+Template with components
+================
+
+<template>
+  <${Link} href="/about">About<//>
+  <${Form} action="/todos">
+    <input type="text" name="title" />
+    <button type="submit">Add</button>
+  <//>
+</template>
+
+---
+
+(source_file
+  (template_block
+    (template_content)))
+
+================
+Empty blocks
+================
+
+<server></server>
+
+<template></template>
+
+---
+
+(source_file
+  (server_block)
+  (template_block))
