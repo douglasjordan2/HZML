@@ -1,0 +1,4 @@
+<template>
+  <input type="${name ? 'radio' : 'checkbox'}" id="${id}" name=${name} checked=${checked} hidden />
+  <${tag||'div'} class="${[...(ontrue||'').split(' ').filter(Boolean).map(c=>'group-has-[#'+id+':checked]/root:'+c),...(onfalse||'').split(' ').filter(Boolean),...(cls||'').split(' ').filter(Boolean)].join(' ')}">${children}<//>
+</template>

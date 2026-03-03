@@ -32,6 +32,41 @@ export function parseRoute(source: string): ParsedRoute {
 
 const componentCache: Record<string, ComponentFn> = {};
 
+const JS_GLOBALS = new Set([
+  'Boolean', 'Number', 'String', 'Array', 'Object', 'Math', 'Date', 'JSON',
+  'undefined', 'null', 'true', 'false', 'Infinity', 'NaN',
+  'parseInt', 'parseFloat', 'isNaN', 'isFinite',
+  'encodeURI', 'decodeURI', 'encodeURIComponent', 'decodeURIComponent',
+  'console', 'window', 'document', 'globalThis',
+  'Map', 'Set', 'Promise', 'Symbol', 'RegExp', 'Error', 'TypeError',
+]);
+
+function extractTemplateVars(template: string): Set<string> {
+  const vars = new Set<string>();
+  const exprRe = /\$\{/g;
+  let m;
+
+  while ((m = exprRe.exec(template)) !== null) {
+    let depth = 1;
+    let i = m.index + 2;
+    while (i < template.length && depth > 0) {
+      if (template[i] === '{') depth++;
+      else if (template[i] === '}') depth--;
+      if (depth > 0) i++;
+    }
+    const expr = template.slice(m.index + 2, i);
+
+    for (const id of expr.matchAll(/(?<!\.)(?<!')(?<!")([a-zA-Z_]\w*)/g)) {
+      const name = id[1];
+      if (!JS_GLOBALS.has(name) && !RESERVED.has(name)) {
+        vars.add(name);
+      }
+    }
+  }
+
+  return vars;
+}
+
 async function loadFromDir(dir: string) {
   let entries;
   try {
@@ -49,8 +84,7 @@ async function loadFromDir(dir: string) {
 
     if (!parsed.template) continue;
 
-    const templateVars = new Set<string>();
-    parsed.template.replace(/\$\{(\w+)/g, (_, v) => { templateVars.add(v); return _; });
+    const templateVars = extractTemplateVars(parsed.template);
 
     const tmpl = parsed.template;
 
@@ -60,6 +94,8 @@ async function loadFromDir(dir: string) {
       for (const v of templateVars) {
         data[v] = undefined;
       }
+
+      data.cls = undefined;
 
       Object.assign(data, props);
 
@@ -89,6 +125,39 @@ export async function loadComponents(projectDir?: string): Promise<void> {
   if (projectDir) {
     await loadFromDir(join(projectDir, "components"));
   }
+
+  componentCache["Toggler"] = (props: Record<string, unknown>) => {
+    const id = props.id as string || "";
+    const on = props.on;
+    const off = props.off;
+    const tag = props.tag as string | undefined;
+    const cls = props.class as string || "";
+    const ontrue = props.ontrue as string || "";
+    const onfalse = props.onfalse as string || "";
+
+    let children = props.children;
+    if (Array.isArray(children)) {
+      children = (children as unknown[])
+        .flat(Infinity)
+        .filter((c: unknown) => c != null && typeof c !== "boolean")
+        .join("");
+    }
+
+    const dir = on !== undefined ? "on" : off !== undefined ? "off" : "";
+    const dirAttr = dir ? ` data-toggle-dir="${dir}"` : "";
+
+    if (tag) {
+      const classes = [
+        ...ontrue.split(" ").filter(Boolean).map(c => `group-has-[#${id}:checked]/root:${c}`),
+        ...onfalse.split(" ").filter(Boolean),
+        ...cls.split(" ").filter(Boolean),
+      ].join(" ");
+
+      return `<${tag}${classes ? ` class="${classes}"` : ""}><label for="${id}"${dirAttr} class="contents cursor-pointer">${children}</label></${tag}>`;
+    }
+
+    return `<label for="${id}"${dirAttr}${cls ? ` class="${cls}"` : ""}>${children}</label>`;
+  };
 }
 
 interface RouteContext {
@@ -143,6 +212,14 @@ export async function executeScript(
   return {};
 }
 
+const RESERVED = new Set([
+  'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
+  'default', 'delete', 'do', 'else', 'export', 'extends', 'finally',
+  'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new',
+  'return', 'static', 'super', 'switch', 'this', 'throw', 'try',
+  'typeof', 'var', 'void', 'while', 'with', 'yield',
+]);
+
 export function renderTemplate(
   template: string,
   data: Record<string, unknown>,
@@ -150,8 +227,8 @@ export function renderTemplate(
   if (!template) return "";
 
   const allData = { ...componentCache, ...data };
-  const keys = Object.keys(allData);
-  const values = Object.values(allData);
+  const keys = Object.keys(allData).filter(k => !RESERVED.has(k));
+  const values = keys.map(k => allData[k]);
 
   const fn = new Function("html", ...keys, "return html`" + template + "`");
   return fn(html, ...values);

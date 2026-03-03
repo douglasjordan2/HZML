@@ -184,6 +184,76 @@ bun run css:watch      # watch mode
 bun run dev            # server + css watch together
 ```
 
+## Client Reactivity
+
+### What even is "state" anyway?
+
+A sidebar slides in. A tab switches. An accordion opens. For the last decade, the industry's answer to these interactions has been: download a JavaScript runtime, construct a virtual representation of your document in memory, diff it against the previous version, and surgically patch the real DOM. All so a `<div>` can do something that looks awfully like `display: none` -> `display: block`.
+
+Real state management is a database transaction, a session token, a shopping cart persisted across tabs. But showing and hiding a panel? Highlighting the active tab? That's a boolean. The browser has had a native boolean state primitive since HTML 2.0 — `<input type="checkbox">`. It persists across interactions. It's queryable with CSS. It requires zero JavaScript to toggle.
+
+HZML takes this literally. Instead of shipping a reactivity engine to the client, we use what's already there:
+
+- **Hidden checkboxes** store boolean state (open/closed, visible/hidden)
+- **Hidden radio buttons** store enum state (which tab, which accordion item)
+- **Labels** dispatch state changes (clicking a label toggles its linked input)
+- **CSS `:has()`** reacts to state changes (if body has a checked #drawer, show the drawer)
+
+No virtual DOM. No diffing. No re-rendering. No hydration. No `useState`, no `useEffect`, no `subscribe()`. The browser does all of it natively, and it's been able to for years. 
+
+### Toggled and Toggler
+
+Two components handle client-side reactivity:
+
+**Toggled** — reactive content that responds to state. Creates a hidden input automatically and wraps its children in a div with reactive Tailwind classes.
+
+```html
+<${Toggled} id="drawer" ontrue="translate-x-0 opacity-100" onfalse="translate-x-full opacity-0"
+  class="fixed top-0 right-0 w-80 h-full bg-white shadow-xl transition-all duration-300">
+  Drawer content here
+<//>
+```
+
+- `id` — names the state. Becomes the hidden input's id.
+- `ontrue` — classes applied when checked. Each gets `group-has-[#id:checked]/root:` prepended automatically.
+- `onfalse` — classes applied unconditionally (the "default" visual state).
+- `name` — optional. Makes it a radio button for enum state (tabs).
+- `checked` — optional. Sets initial state.
+
+Multiple Toggled components can share the same `id` — only one hidden input is created.
+
+**Toggler** — a trigger that changes state. Renders a `<label>` pointing at a Toggled's id.
+
+```html
+<${Toggler} id="drawer" class="cursor-pointer">Open<//>
+```
+
+- `on` — can only check (becomes unclickable once checked)
+- `off` — can only uncheck (becomes unclickable when unchecked)
+- Neither — toggles both directions
+
+### Tabs with radio buttons
+
+Pass `name` to group Toggled components as radio buttons. The browser enforces mutual exclusion — checking one unchecks the others. No JavaScript coordination needed.
+
+```html
+<${Toggler} id="tab-features">Features<//>
+<${Toggler} id="tab-pricing">Pricing<//>
+
+<${Toggled} id="tab-features" name="tabs" checked ontrue="block" onfalse="hidden">
+  Features content
+<//>
+<${Toggled} id="tab-pricing" name="tabs" ontrue="block" onfalse="hidden">
+  Pricing content
+<//>
+```
+
+### What about everything else?
+
+We're in active research to find the limits of what CSS `:has()` and native form elements can do without JavaScript. Toggles cover the common cases — drawers, modals, tabs, accordions, dropdowns, tooltips — anything that's fundamentally "show this, hide that."
+
+For everything beyond visual state — data fetching, form submission, real-time updates, anything that touches the server — HZML uses the server round-trip. Click a link, the server responds with HTML, HTMZ swaps it into the page. That's not a limitation, that's the architecture. The server is the state machine. The client is a viewport.
+
 ## Database
 
 SQLite is the default database — zero config, zero dependencies on Bun. Available as `hzml.db` in server blocks:
@@ -249,6 +319,38 @@ HZML includes a [Tree-sitter](https://tree-sitter.github.io/) grammar for syntax
 No VS Code extension yet. Tree-sitter gives us precise, context-aware highlighting with the right level of complexity for an opinionated framework. If someone wants to build a TextMate grammar or VS Code extension, PRs welcome.
 
 ### Neovim setup
+
+#### With nvim-treesitter
+
+Add the parser config to your nvim-treesitter setup, pointing to your local clone:
+
+```lua
+local treesitter_parser_config = require("nvim-treesitter.parsers").get_parser_configs()
+
+treesitter_parser_config.hzml = {
+  install_info = {
+    url = "/path/to/hzml/tree-sitter-hzml",
+    files = {"src/parser.c", "src/scanner.c"},
+    branch = "main",
+  },
+}
+
+vim.treesitter.language.register("hzml", "hzml")
+vim.filetype.add({ extension = { hzml = "hzml" } })
+```
+
+Then run `:TSInstall hzml`.
+
+Copy the query files to your Neovim runtimepath:
+
+```bash
+mkdir -p ~/.local/share/nvim/site/queries/hzml
+cp tree-sitter-hzml/queries/hzml/* ~/.local/share/nvim/site/queries/hzml/
+```
+
+> **Note:** The `url` must point to the `tree-sitter-hzml` directory directly — not the parent repo. Using the GitHub URL won't work because the grammar lives in a subdirectory, and nvim-treesitter can't resolve it during compilation.
+
+#### Manual setup
 
 Requires [`tree-sitter-cli`](https://github.com/tree-sitter/tree-sitter/blob/master/cli/README.md) and a C compiler.
 

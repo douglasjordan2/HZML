@@ -6,6 +6,7 @@ out
 dist
 *.tgz
 public/app.css
+.toggle-manifest
 
 # code coverage
 coverage

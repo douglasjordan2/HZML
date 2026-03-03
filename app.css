@@ -1,2 +1,3 @@
 @import "tailwindcss";
 @source "./routes/**/*.hzml";
+@source "./.toggle-manifest";

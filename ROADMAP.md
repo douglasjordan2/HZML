@@ -21,6 +21,33 @@
 - DatabaseAdapter interface for custom providers (async-capable)
 - Tree-sitter grammar for .hzml syntax highlighting (Neovim — block boundaries + TypeScript/HTML injection)
 
+## Client Reactivity
+- Toggle system v1: Toggled + Toggler components, hidden checkbox/radio state, CSS :has() reactivity ✓
+- Toggled: auto-creates hidden input, ontrue/onfalse class prefixing, tag prop for wrapper element ✓
+- Toggler: programmatic component with tag prop (wraps label in container with reactive classes) ✓
+- Toggle manifest for Tailwind class discovery (.toggle-manifest, @source in app.css) ✓
+- generateToggleCSS: server-side pointer-events rules for directional Togglers (on/off) ✓
+- Deduplication of hidden inputs when multiple Toggled components share an ID ✓
+- ID hashing: deterministic collision-free IDs (filepath-based) for component reuse across templates
+- Toggled v2: explore limits of :has() — nested state, state combinations, transition choreography
+- Research: what patterns genuinely need JS vs. what CSS :has() can handle
+
+## Component Server Blocks
+.hzml templates compile into tagged template literals via string concatenation. This works for most components — a single element with props and children. But components that need structural branching (render different DOM trees based on props) hit a wall: nested html`` calls collide with the outer template literal's backticks.
+
+Toggler was the first case (tag prop requires wrapping a label in a container OR rendering a bare label). Currently solved by registering it as a programmatic component in router.ts. This works for framework internals but isn't available to authors.
+
+The fix: support `<server>` blocks in component .hzml files. parseRoute already extracts them — they're just ignored for components today. The server block would export a render function that replaces template-based rendering when structural branching is needed.
+
+- Simple components stay as they are: just a `<template>` block, no ceremony
+- Complex components add a `<server>` block with a render function for full JS control
+- Both live in .hzml files — no second file format, no context switch
+- The template block could serve as the default/fallback, with the server block overriding when present
+
+Alternatives considered:
+- .ts component files: works but breaks the single-file-format principle
+- Fixing the template engine to avoid backtick collision: most correct, biggest lift — worth revisiting when the engine is more mature
+
 ## Next
 - SSE / streaming: deferred data with resolveData seam (Remix-style defer pattern)
 - Head tag architecture (per-route title, meta — full page only, title updates on HTMZ nav)

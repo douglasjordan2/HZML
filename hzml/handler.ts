@@ -1,5 +1,5 @@
 import { join, extname } from "path";
-import { readFile, access, readdir, stat } from "fs/promises";
+import { readFile, access, readdir, stat, writeFile } from "fs/promises";
 import { parseRoute, executeScript, renderTemplate } from "./router";
 import type { DatabaseAdapter } from "./db";
 
@@ -13,6 +13,24 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 export function createHandler(routesDir: string, publicDir: string, db?: DatabaseAdapter) {
+
+const manifestPath = join(routesDir, "..", ".toggle-manifest");
+const manifestClasses = new Set<string>();
+
+function updateToggleManifest(body: string): void {
+  const re = /group-has-\[#[\w-]+:checked\]\/root:[\w\[\]\/:.!-]+/g;
+  let m;
+  let changed = false;
+  while ((m = re.exec(body)) !== null) {
+    if (!manifestClasses.has(m[0])) {
+      manifestClasses.add(m[0]);
+      changed = true;
+    }
+  }
+  if (changed) {
+    writeFile(manifestPath, [...manifestClasses].join("\n")).catch(() => {});
+  }
+}
 
 async function fileExists(path: string): Promise<boolean> {
   try {
@@ -145,15 +163,16 @@ async function walk(
   return null;
 }
 
-const shell = (body: string): string => `<!DOCTYPE html>
+const shell = (body: string, head = ""): string => `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HZML</title>
   <link rel="stylesheet" href="/app.css">
+  ${head}
 </head>
-<body>
+<body class="group/root">
   ${body}
   <iframe hidden name="htmz" onload="
     if (!contentDocument || !contentDocument.body.childNodes.length) return;
@@ -215,6 +234,55 @@ function mergeChannels(body: string): string {
   );
 }
 
+function deduplicateToggleInputs(body: string): string {
+  const seen = new Set<string>();
+  return body.replace(/<input type="(?:checkbox|radio)" id="([^"]+)"[^>]*hidden\s*\/?>/g, (match, id) => {
+    if (seen.has(id)) return '';
+    seen.add(id);
+    return match;
+  });
+}
+
+function generateToggleCSS(body: string): string {
+  const re = /<label[^>]+data-toggle-dir="(on|off)"[^>]+for="([^"]+)"/g;
+  const rules: string[] = [];
+  const seen = new Set<string>();
+  let m;
+
+  while ((m = re.exec(body)) !== null) {
+    const dir = m[1];
+    const id = m[2];
+    const key = `${dir}:${id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    if (dir === "on") {
+      rules.push(`:has(#${id}:checked) label[data-toggle-dir="on"][for="${id}"] { pointer-events: none; }`);
+    } else {
+      rules.push(`label[data-toggle-dir="off"][for="${id}"] { pointer-events: none; }`);
+      rules.push(`:has(#${id}:checked) label[data-toggle-dir="off"][for="${id}"] { pointer-events: auto; }`);
+    }
+  }
+
+  const forFirstRe = /<label[^>]+for="([^"]+)"[^>]+data-toggle-dir="(on|off)"/g;
+  while ((m = forFirstRe.exec(body)) !== null) {
+    const id = m[1];
+    const dir = m[2];
+    const key = `${dir}:${id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    if (dir === "on") {
+      rules.push(`:has(#${id}:checked) label[data-toggle-dir="on"][for="${id}"] { pointer-events: none; }`);
+    } else {
+      rules.push(`label[data-toggle-dir="off"][for="${id}"] { pointer-events: none; }`);
+      rules.push(`:has(#${id}:checked) label[data-toggle-dir="off"][for="${id}"] { pointer-events: auto; }`);
+    }
+  }
+
+  return rules.length ? `<style>${rules.join("\n")}</style>` : "";
+}
+
 function htmlResponse(body: string): Response {
   return new Response(body, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -259,7 +327,10 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
     body = mergeChannels(body);
   }
 
-  return htmlResponse(shell(body));
+  body = deduplicateToggleInputs(body);
+  const toggleCSS = generateToggleCSS(body);
+  updateToggleManifest(body);
+  return htmlResponse(shell(body, toggleCSS));
 }
 
 return async function handler(req: Request): Promise<Response> {

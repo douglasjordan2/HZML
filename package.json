@@ -5,8 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "bun run build && bun run css:watch & bun --watch index.ts",
-    "build": "bunx @tailwindcss/cli -i app.css -o public/app.css --minify",
-    "css:watch": "bunx @tailwindcss/cli -i app.css -o public/app.css --watch"
+    "build": "touch .toggle-manifest && bunx @tailwindcss/cli -i app.css -o public/app.css --minify",
+    "css:watch": "touch .toggle-manifest && bunx @tailwindcss/cli -i app.css -o public/app.css --watch"
   },
   "devDependencies": {
     "@types/bun": "latest"

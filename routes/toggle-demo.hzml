@@ -1,0 +1,77 @@
+<template>
+  <div>
+    <h1 class="text-3xl font-bold mb-6">Toggle System</h1>
+
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold mb-4">Drawer</h2>
+
+      <${Toggler} id="drawer" on class="inline-block px-4 py-2 bg-black text-white rounded cursor-pointer select-none">Open Drawer<//>
+
+      <${Toggled} id="drawer" ontrue="translate-x-0 opacity-100" onfalse="translate-x-full opacity-0" class="fixed top-0 right-0 h-full w-80 bg-white shadow-xl p-6 transition-all duration-300 z-50">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Drawer</h3>
+          <${Toggler} id="drawer" off class="text-gray-400 hover:text-black cursor-pointer select-none text-2xl leading-none">×<//>
+        </div>
+        <p class="text-gray-600">This drawer uses a checkbox toggle. No JavaScript.</p>
+      <//>
+
+      <${Toggled} id="drawer" ontrue="fixed inset-0 bg-black/30 z-40" onfalse="hidden">
+        <${Toggler} id="drawer" off class="block w-full h-full cursor-pointer"> <//>
+      <//>
+    </section>
+
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold mb-4">Tabs</h2>
+
+      <div class="flex gap-1 mb-4">
+        <${Toggler} id="tab-features" tag="button" class="px-4 py-2 rounded-t border border-b-0 border-gray-200 select-none" ontrue="bg-white font-semibold" onfalse="bg-gray-100 text-gray-500">Features<//>
+        <${Toggler} id="tab-pricing" tag="button" class="px-4 py-2 rounded-t border border-b-0 border-gray-200 select-none" ontrue="bg-white font-semibold" onfalse="bg-gray-100 text-gray-500">Pricing<//>
+        <${Toggler} id="tab-about" tag="button" class="px-4 py-2 rounded-t border border-b-0 border-gray-200 select-none" ontrue="bg-white font-semibold" onfalse="bg-gray-100 text-gray-500">About<//>
+      </div>
+
+      <${Toggled} id="tab-features" name="tabs" checked ontrue="block" onfalse="hidden" class="border border-gray-200 rounded-b p-4">
+        <p class="font-medium mb-2">Features</p>
+        <ul class="list-disc pl-5 text-gray-600">
+          <li>Server-rendered reactivity</li>
+          <li>Zero JavaScript</li>
+          <li>CSS :has() powered</li>
+        </ul>
+      <//>
+
+      <${Toggled} id="tab-pricing" name="tabs" ontrue="block" onfalse="hidden" class="border border-gray-200 rounded-b p-4">
+        <p class="font-medium mb-2">Pricing</p>
+        <p class="text-gray-600">Free and open source.</p>
+      <//>
+
+      <${Toggled} id="tab-about" name="tabs" ontrue="block" onfalse="hidden" class="border border-gray-200 rounded-b p-4">
+        <p class="font-medium mb-2">About</p>
+        <p class="text-gray-600">HZML is a hypermedia framework.</p>
+      <//>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-4">Accordion</h2>
+
+      <div class="border border-gray-200 rounded divide-y divide-gray-200">
+        <div>
+          <${Toggler} id="acc-1" class="block w-full px-4 py-3 font-medium cursor-pointer select-none hover:bg-gray-50">What is HZML?<//>
+          <${Toggled} id="acc-1" ontrue="block" onfalse="hidden" class="px-4 pb-3">
+            <p class="text-gray-600">A hypermedia framework that uses server rendering and CSS for client-side reactivity.</p>
+          <//>
+        </div>
+        <div>
+          <${Toggler} id="acc-2" class="block w-full px-4 py-3 font-medium cursor-pointer select-none hover:bg-gray-50">How does it work?<//>
+          <${Toggled} id="acc-2" ontrue="block" onfalse="hidden" class="px-4 pb-3">
+            <p class="text-gray-600">Hidden checkboxes store state. CSS :has() selectors react to checked state. Labels dispatch toggle actions.</p>
+          <//>
+        </div>
+        <div>
+          <${Toggler} id="acc-3" class="block w-full px-4 py-3 font-medium cursor-pointer select-none hover:bg-gray-50">Is JavaScript required?<//>
+          <${Toggled} id="acc-3" ontrue="block" onfalse="hidden" class="px-4 pb-3">
+            <p class="text-gray-600">No. The entire toggle system runs on HTML and CSS only.</p>
+          <//>
+        </div>
+      </div>
+    </section>
+  </div>
+</template>
