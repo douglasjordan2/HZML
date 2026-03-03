@@ -188,7 +188,7 @@ bun run dev            # server + css watch together
 
 ### What even is "state" anyway?
 
-A sidebar slides in. A tab switches. An accordion opens. For the last decade, the industry's answer to these interactions has been: download a JavaScript runtime, construct a virtual representation of your document in memory, diff it against the previous version, and surgically patch the real DOM. All so a `<div>` can do something that looks awfully like `display: none` -> `display: block`.
+A sidebar slides in. A tab switches. An accordion opens. For the last decade, the industry's answer to these interactions has been: download a JS file, construct a virtual representation of your document in memory, diff it against the previous version, and surgically patch the real DOM. All so a `<div>` can do something that looks awfully like `display: none` -> `display: block`.
 
 Real state management is a database transaction, a session token, a shopping cart persisted across tabs. But showing and hiding a panel? Highlighting the active tab? That's a boolean. The browser has had a native boolean state primitive since HTML 2.0 — `<input type="checkbox">`. It persists across interactions. It's queryable with CSS. It requires zero JavaScript to toggle.
 
