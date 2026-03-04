@@ -248,11 +248,28 @@ Pass `name` to group Toggled components as radio buttons. The browser enforces m
 <//>
 ```
 
+### Counter (numeric state)
+
+Toggles handle booleans. But some UI patterns need a number — quantity steppers, rating pickers, pagination. CSS can't do arithmetic, so HZML uses a minimal protocol: anchor tags that navigate a cached `/noop.html` route with a hash encoding the new value.
+
+```html
+<a data-counter="qty" data-step="-1" href="/noop.html?0#qty=0" target="htmz">-</a>
+<span data-counter="qty">1</span>
+<a data-counter="qty" data-step="1" href="/noop.html?2#qty=2" target="htmz">+</a>
+<input data-counter="qty" type="hidden" name="quantity" value="1" />
+```
+
+- `data-counter` binds an element to a state key. The element's role is determined by its type: anchors with `data-step` are setters (hrefs recomputed on each click), `<input>` elements get their value updated, everything else gets `textContent` updated.
+- `data-min` / `data-max` on the display element enforces bounds.
+- Multiple steppers sharing the same counter name stay in sync.
+
+The state is deterministic — `qty + 1` is always known at click time. The href pre-computes the result, the iframe loads a cached noop document, and the `onload` handler parses the hash and updates the DOM. No server round-trip for trivial arithmetic.
+
+This is not a general-purpose reactivity system. It's for buffered server inputs — values that will eventually be sent to the server (add to cart, update quantity). The non-deterministic part (cart validation, inventory checks, discounts) is always the server round-trip via regular HTMZ navigation.
+
 ### What about everything else?
 
-We're in active research to find the limits of what CSS `:has()` and native form elements can do without JavaScript. Toggles cover the common cases — drawers, modals, tabs, accordions, dropdowns, tooltips — anything that's fundamentally "show this, hide that."
-
-For everything beyond visual state — data fetching, form submission, real-time updates, anything that touches the server — HZML uses the server round-trip. Click a link, the server responds with HTML, HTMZ swaps it into the page. That's not a limitation, that's the architecture. The server is the state machine. The client is a viewport.
+Toggles cover the common cases — drawers, modals, tabs, accordions, dropdowns, tooltips — anything that's fundamentally "show this, hide that." Counters cover bounded numeric inputs. For everything beyond that — data fetching, form submission, real-time updates, anything that touches the server — HZML uses the server round-trip. Click a link, the server responds with HTML, HTMZ swaps it into the page. That's not a limitation, that's the architecture. The server is the state machine. The client is a viewport.
 
 ## Database
 

@@ -1,10 +1,10 @@
 import htm from "htm";
 
 type ComponentFn = (props: Record<string, unknown>) => string;
-type HtmlChild = string | number | boolean | null | undefined | HtmlChild[];
-type PropValue = string | number | boolean | null | undefined;
+export type HtmlChild = string | number | boolean | null | undefined | HtmlChild[];
+export type PropValue = string | number | boolean | null | undefined;
 
-function h(type: string | ComponentFn, props: Record<string, PropValue> | null, ...children: HtmlChild[]): string {
+export function h(type: string | ComponentFn, props: Record<string, PropValue> | null, ...children: HtmlChild[]): string {
   if (typeof type === "function") {
     return type({ ...props, children: children.flat() });
   }

@@ -27,7 +27,10 @@
 - Toggler: programmatic component with tag prop (wraps label in container with reactive classes) ✓
 - Toggle manifest for Tailwind class discovery (.toggle-manifest, @source in app.css) ✓
 - generateToggleCSS: server-side pointer-events rules for directional Togglers (on/off) ✓
-- Deduplication of hidden inputs when multiple Toggled components share an ID ✓
+- Render-time toggle registry: per-request RenderContext threads through component tree, single input per unique ID — no dedup pass ✓
+- Toggled as programmatic component: register-then-emit replaces inline input + regex cleanup ✓
+- htmz shell extracted to hzml/htmz.ts: upstream dev pattern (<script> tag + window.htmz(this)), setTimeout wrapper, extensible function ✓
+- Counter protocol: deterministic numeric state via /noop.html route + hash (#key=value), data-counter binding, data-step for setters, data-min/data-max bounds, Map-based state store, synced multi-stepper support ✓
 - ID hashing: deterministic collision-free IDs (filepath-based) for component reuse across templates
 - Toggled v2: explore limits of :has() — nested state, state combinations, transition choreography
 - Research: what patterns genuinely need JS vs. what CSS :has() can handle

@@ -1,0 +1,59 @@
+<template>
+  <div>
+    <h1 class="text-3xl font-bold mb-6">Counter</h1>
+
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold mb-4">Quantity Stepper</h2>
+
+      <div class="flex items-center gap-3">
+        <a data-counter="qty" data-step="-1" href="/noop.html?0#qty=0" target="htmz"
+           class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">-</a>
+        <span data-counter="qty" class="text-2xl font-mono w-8 text-center">1</span>
+        <a data-counter="qty" data-step="1" href="/noop.html?2#qty=2" target="htmz"
+           class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">+</a>
+        <input data-counter="qty" type="hidden" name="quantity" value="1" />
+      </div>
+    </section>
+
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold mb-4">Bounded (1–10)</h2>
+
+      <div class="flex items-center gap-3">
+        <a data-counter="bounded" data-step="-1" href="/noop.html?0#bounded=0" target="htmz"
+           class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">-</a>
+        <span data-counter="bounded" data-min="1" data-max="10" class="text-2xl font-mono w-8 text-center">1</span>
+        <a data-counter="bounded" data-step="1" href="/noop.html?2#bounded=2" target="htmz"
+           class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">+</a>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-4">Synced Steppers</h2>
+      <p class="text-gray-500 mb-4">Two steppers, same counter name. They stay in sync.</p>
+
+      <div class="flex gap-12">
+        <div>
+          <p class="text-sm text-gray-400 mb-2">Main</p>
+          <div class="flex items-center gap-3">
+            <a data-counter="synced" data-step="-1" href="/noop.html?0#synced=0" target="htmz"
+               class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">-</a>
+            <span data-counter="synced" class="text-2xl font-mono w-8 text-center">1</span>
+            <a data-counter="synced" data-step="1" href="/noop.html?2#synced=2" target="htmz"
+               class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">+</a>
+          </div>
+        </div>
+
+        <div>
+          <p class="text-sm text-gray-400 mb-2">Sticky bar</p>
+          <div class="flex items-center gap-3">
+            <a data-counter="synced" data-step="-1" href="/noop.html?0#synced=0" target="htmz"
+               class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">-</a>
+            <span data-counter="synced" class="text-2xl font-mono w-8 text-center">1</span>
+            <a data-counter="synced" data-step="1" href="/noop.html?2#synced=2" target="htmz"
+               class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">+</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</template>

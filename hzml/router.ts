@@ -1,11 +1,13 @@
 import { join, basename } from "path";
 import { readdir, readFile } from "fs/promises";
-import { html } from "./render";
+import htm from "htm";
+import { html, h as baseH, type HtmlChild, type PropValue } from "./render";
+import type { RenderContext } from "./state";
 import type { DatabaseAdapter } from "./db";
 
 const BUILT_IN_COMPONENTS = join(import.meta.dirname ?? import.meta.dir, "components");
 
-type ComponentFn = (props: Record<string, unknown>) => string;
+type ComponentFn = (props: Record<string, unknown>, ctx?: RenderContext) => string;
 type RouteHandler = (req: HzmlRequest) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
 interface HzmlRequest {
@@ -88,7 +90,7 @@ async function loadFromDir(dir: string) {
 
     const tmpl = parsed.template;
 
-    componentCache[name] = (props: Record<string, unknown>) => {
+    componentCache[name] = (props: Record<string, unknown>, ctx?: RenderContext) => {
       const data: Record<string, unknown> = {};
 
       for (const v of templateVars) {
@@ -111,7 +113,7 @@ async function loadFromDir(dir: string) {
           .join("");
       }
 
-      return renderTemplate(tmpl, data);
+      return renderTemplate(tmpl, data, ctx);
     };
   }
 
@@ -126,38 +128,31 @@ export async function loadComponents(projectDir?: string): Promise<void> {
     await loadFromDir(join(projectDir, "components"));
   }
 
-  componentCache["Toggler"] = (props: Record<string, unknown>) => {
-    const id = props.id as string || "";
-    const on = props.on;
-    const off = props.off;
-    const tag = props.tag as string | undefined;
-    const cls = props.class as string || "";
-    const ontrue = props.ontrue as string || "";
-    const onfalse = props.onfalse as string || "";
+  componentCache['Toggled'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
+    const id = props.id as string;
+    const name = props.name as string | undefined;
+    const checked = !!props.checked;
+    const ontrue = (props.ontrue as string) || '';
+    const onfalse = (props.onfalse as string) || '';
+    const cls = ((props.class as string) || '');
+    const tag = (props.tag as string) || 'div';
+    const children = Array.isArray(props.children)
+      ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
+      : (props.children || '');
 
-    let children = props.children;
-    if (Array.isArray(children)) {
-      children = (children as unknown[])
-        .flat(Infinity)
-        .filter((c: unknown) => c != null && typeof c !== "boolean")
-        .join("");
+    if (ctx) {
+      ctx.toggleRegistry.register(id, name, checked);
     }
 
-    const dir = on !== undefined ? "on" : off !== undefined ? "off" : "";
-    const dirAttr = dir ? ` data-toggle-dir="${dir}"` : "";
+    const classes = [
+      ...ontrue.split(' ').filter(Boolean).map(c => `group-has-[#${id}:checked]/root:${c}`),
+      ...onfalse.split(' ').filter(Boolean),
+      ...cls.split(' ').filter(Boolean),
+    ].join(' ');
 
-    if (tag) {
-      const classes = [
-        ...ontrue.split(" ").filter(Boolean).map(c => `group-has-[#${id}:checked]/root:${c}`),
-        ...onfalse.split(" ").filter(Boolean),
-        ...cls.split(" ").filter(Boolean),
-      ].join(" ");
-
-      return `<${tag}${classes ? ` class="${classes}"` : ""}><label for="${id}"${dirAttr} class="contents cursor-pointer">${children}</label></${tag}>`;
-    }
-
-    return `<label for="${id}"${dirAttr}${cls ? ` class="${cls}"` : ""}>${children}</label>`;
+    return `<${tag} class="${classes}">${children}</${tag}>`;
   };
+
 }
 
 interface RouteContext {
@@ -223,6 +218,7 @@ const RESERVED = new Set([
 export function renderTemplate(
   template: string,
   data: Record<string, unknown>,
+  ctx?: RenderContext,
 ): string {
   if (!template) return "";
 
@@ -230,6 +226,24 @@ export function renderTemplate(
   const keys = Object.keys(allData).filter(k => !RESERVED.has(k));
   const values = keys.map(k => allData[k]);
 
+  let htmlFn: (strings: TemplateStringsArray, ...vals: unknown[]) => string;
+
+  if (ctx) {
+    const ctxH = (type: string | ComponentFn, props: Record<string, PropValue> | null, ...children: HtmlChild[]): string => {
+      if (typeof type === "function") {
+        return type({ ...props, children: children.flat() }, ctx);
+      }
+      return baseH(type, props, ...children);
+    };
+    const _ctxHtml = htm.bind(ctxH);
+    htmlFn = (strings: TemplateStringsArray, ...vals: unknown[]): string => {
+      const result = _ctxHtml(strings, ...vals);
+      return Array.isArray(result) ? (result as string[]).join("") : result as string;
+    };
+  } else {
+    htmlFn = html;
+  }
+
   const fn = new Function("html", ...keys, "return html`" + template + "`");
-  return fn(html, ...values);
+  return fn(htmlFn, ...values);
 }

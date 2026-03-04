@@ -1,9 +1,12 @@
 import { join, extname } from "path";
 import { readFile, access, readdir, stat, writeFile } from "fs/promises";
 import { parseRoute, executeScript, renderTemplate } from "./router";
+import { createToggleRegistry, type RenderContext } from "./state";
+import { htmz } from "./htmz";
 import type { DatabaseAdapter } from "./db";
 
 const MIME_TYPES: Record<string, string> = {
+  ".html": "text/html",
   ".css": "text/css",
   ".js": "application/javascript",
   ".json": "application/json",
@@ -163,26 +166,6 @@ async function walk(
   return null;
 }
 
-const shell = (body: string, head = ""): string => `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HZML</title>
-  <link rel="stylesheet" href="/app.css">
-  ${head}
-</head>
-<body class="group/root">
-  ${body}
-  <iframe hidden name="htmz" onload="
-    if (!contentDocument || !contentDocument.body.childNodes.length) return;
-    [...contentDocument.querySelectorAll('[id]')].map(e => document.getElementById(e.id)?.replaceWith(e));
-    document.querySelectorAll('[data-emit]').forEach(e => document.querySelectorAll('[data-listen=&quot;'+e.dataset.emit+'&quot;]').forEach(t => t.innerHTML = e.innerHTML));
-    history.pushState(null, '', contentWindow.location.pathname);
-  "></iframe>
-</body>
-</html>`;
-
 async function resolveData(data: Record<string, unknown>): Promise<Record<string, unknown>> {
   const entries = Object.entries(data);
   const resolved = await Promise.all(
@@ -234,15 +217,6 @@ function mergeChannels(body: string): string {
   );
 }
 
-function deduplicateToggleInputs(body: string): string {
-  const seen = new Set<string>();
-  return body.replace(/<input type="(?:checkbox|radio)" id="([^"]+)"[^>]*hidden\s*\/?>/g, (match, id) => {
-    if (seen.has(id)) return '';
-    seen.add(id);
-    return match;
-  });
-}
-
 function generateToggleCSS(body: string): string {
   const re = /<label[^>]+data-toggle-dir="(on|off)"[^>]+for="([^"]+)"/g;
   const rules: string[] = [];
@@ -290,6 +264,7 @@ function htmlResponse(body: string): Response {
 }
 
 async function renderRoute(match: RouteMatch, isPartial: boolean, request: Request): Promise<Response> {
+  const ctx: RenderContext = { toggleRegistry: createToggleRegistry() };
   const source = await readFile(match.filePath, "utf-8");
   const route = parseRoute(source);
 
@@ -303,9 +278,9 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
     }
 
     const data = await resolveData(raw);
-    body = route.template ? renderTemplate(route.template, data) : "";
+    body = route.template ? renderTemplate(route.template, data, ctx) : "";
   } else {
-    body = route.template ? renderTemplate(route.template, {}) : source;
+    body = route.template ? renderTemplate(route.template, {}, ctx) : source;
   }
 
   const [rootLayout, ...nestedLayouts] = match.layouts;
@@ -314,23 +289,29 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
     const source = await readFile(layoutPath, "utf-8");
     const layout = parseRoute(source);
     const tmpl = layout.template || source;
-    body = renderTemplate(tmpl, { children: body });
+    body = renderTemplate(tmpl, { children: body }, ctx);
   }
 
-  if (isPartial) return htmlResponse(`<div id="content">${body}</div>`);
+  if (isPartial) {
+    const toggleInputs = ctx.toggleRegistry.emit();
+    return htmlResponse(`<div id="content">${toggleInputs}${body}</div>`);
+  }
 
   if (rootLayout) {
     const source = await readFile(rootLayout, "utf-8");
     const layout = parseRoute(source);
     const tmpl = layout.template || source;
-    body = renderTemplate(tmpl, { children: body });
+    body = renderTemplate(tmpl, { children: body }, ctx);
     body = mergeChannels(body);
   }
 
-  body = deduplicateToggleInputs(body);
+  const toggleInputs = ctx.toggleRegistry.emit();
+  if (toggleInputs) {
+    body = toggleInputs + '\n' + body;
+  }
   const toggleCSS = generateToggleCSS(body);
   updateToggleManifest(body);
-  return htmlResponse(shell(body, toggleCSS));
+  return htmlResponse(htmz(body, toggleCSS));
 }
 
 return async function handler(req: Request): Promise<Response> {

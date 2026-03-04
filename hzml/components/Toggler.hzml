@@ -1,0 +1,5 @@
+<template>
+  ${tag
+    ? `<${tag} class="${[...(ontrue||'').split(' ').filter(Boolean).map(c => 'group-has-[#'+id+':checked]/root:'+c),...(onfalse||'').split(' ').filter(Boolean),...(cls||'').split(' ').filter(Boolean)].join(' ')}"><label for="${id}"${on !== undefined ? ' data-toggle-dir="on"' : off !== undefined ? ' data-toggle-dir="off"' : ''} class="contents cursor-pointer">${children}</label></${tag}>`
+    : `<label for="${id}"${on !== undefined ? ' data-toggle-dir="on"' : off !== undefined ? ' data-toggle-dir="off"' : ''}${cls ? ` class="${cls}"` : ''}>${children}</label>`}
+</template>
