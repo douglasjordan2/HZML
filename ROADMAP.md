@@ -31,6 +31,8 @@
 - Toggled as programmatic component: register-then-emit replaces inline input + regex cleanup ✓
 - htmz shell extracted to hzml/htmz.ts: upstream dev pattern (<script> tag + window.htmz(this)), setTimeout wrapper, extensible function ✓
 - Counter protocol: deterministic numeric state via /noop.html route + hash (#key=value), data-counter binding, data-step for setters, data-min/data-max bounds, Map-based state store, synced multi-stepper support ✓
+- Stepper/Stepped components: componentize counter buttons (Stepper dispatches, Stepped subscribes, counter name is shared channel)
+- StepGroup: compound state transitions — wraps multiple Steppers sharing one <a> tag, each contributes a fragment segment (#key1=v1&key2=v2), single click updates multiple counters
 - ID hashing: deterministic collision-free IDs (filepath-based) for component reuse across templates
 - Toggled v2: explore limits of :has() — nested state, state combinations, transition choreography
 - Research: what patterns genuinely need JS vs. what CSS :has() can handle
@@ -72,6 +74,7 @@ Alternatives considered:
 - Error boundaries (what renders when a script throws?)
 - 404/500 route files
 - Hot reload in dev mode
+- Component hot reload: file watcher on component directories (built-in + user) that invalidates componentCache and re-runs loadFromDir on change — currently any .hzml component edit requires full server restart
 - Production build (single binary via bun build --compile or deno compile)
 - Document event delegation pattern for client interactivity
 - Web component integration for stateful client-side components

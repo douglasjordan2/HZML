@@ -1,0 +1,11 @@
+<template>
+  <a 
+    data-counter="${target}" 
+    data-step="${step}" 
+    href="/noop.html?${initialValue || 0}#${target}=${initialValue || 0}" 
+    target="htmz" 
+    class="${cls || ''}"
+  >
+    ${children}
+  </a>
+</template>

@@ -6,11 +6,20 @@
       <h2 class="text-xl font-semibold mb-4">Quantity Stepper</h2>
 
       <div class="flex items-center gap-3">
-        <a data-counter="qty" data-step="-1" href="/noop.html?0#qty=0" target="htmz"
-           class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">-</a>
-        <span data-counter="qty" class="text-2xl font-mono w-8 text-center">1</span>
-        <a data-counter="qty" data-step="1" href="/noop.html?2#qty=2" target="htmz"
-           class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">+</a>
+        <${Stepper} 
+          target="qty"
+          initialValue="0" 
+          step="-1"
+          class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer"
+        >-<//>
+        <${Stepped} by="qty" tag="span" class="text-2xl font-mono w-8 text-center" value="1" />
+        <${Stepper} 
+          target="qty"
+          initialValue="2" 
+          step="+1"
+          class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer"
+        >+<//>
+        <${Stepped} by="qty" value="1" name="quantity" />
         <input data-counter="qty" type="hidden" name="quantity" value="1" />
       </div>
     </section>

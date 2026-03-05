@@ -223,7 +223,7 @@ export function renderTemplate(
   if (!template) return "";
 
   const allData = { ...componentCache, ...data };
-  const keys = Object.keys(allData).filter(k => !RESERVED.has(k));
+  const keys = Object.keys(allData).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
   const values = keys.map(k => allData[k]);
 
   let htmlFn: (strings: TemplateStringsArray, ...vals: unknown[]) => string;
