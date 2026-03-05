@@ -115,7 +115,7 @@ Add `layout.hzml` at any directory level. Layouts nest automatically — a route
 
 Components are `.hzml` files in `components/`. They're globally available in all templates — no imports needed.
 
-Four built-in components ship with the framework: **`Link`**, **`Form`**, **`Emitter`**, and **`Listener`**. The first two exist because of how HTMZ works under the hood.
+Built-in components ship with the framework: **`Link`**, **`Form`**, **`Emitter`**, **`Listener`**, **`Toggled`**, **`Toggler`**, **`Stepper`**, and **`Stepped`**. The first two exist because of how HTMZ works under the hood.
 
 HTMZ uses a hidden `<iframe name="htmz">` for navigation. When a link or form targets that iframe, the browser loads the response into it. The iframe's `onload` handler finds every element with an ID in the response and replaces the matching element on the page, then updates the URL via `history.pushState`. No client-side JavaScript framework, no fetch calls — just native browser behavior.
 
@@ -266,6 +266,34 @@ Toggles handle booleans. But some UI patterns need a number — quantity stepper
 The state is deterministic — `qty + 1` is always known at click time. The href pre-computes the result, the iframe loads a cached noop document, and the `onload` handler parses the hash and updates the DOM. No server round-trip for trivial arithmetic.
 
 This is not a general-purpose reactivity system. It's for buffered server inputs — values that will eventually be sent to the server (add to cart, update quantity). The non-deterministic part (cart validation, inventory checks, discounts) is always the server round-trip via regular HTMZ navigation.
+
+### Stepper and Stepped
+
+Two components wrap the counter protocol so you don't wire up `data-counter`, `data-step`, and the noop href by hand:
+
+**Stepper** — dispatches a state change. Renders an anchor with the counter protocol wired up.
+
+```html
+<${Stepper} target="qty" step="-1" initialValue="0">-<//>
+<${Stepper} target="qty" step="1" initialValue="2">+<//>
+```
+
+- `target` — the counter name to update
+- `step` — how much to add/subtract per click
+- `initialValue` — the pre-computed result for the first click
+
+**Stepped** — subscribes to a counter's state. Renders either a visible element (when `tag` is provided) or a hidden input (for form submission).
+
+```html
+<${Stepped} by="qty" tag="span" value="1" />
+
+<${Stepped} by="qty" name="quantity" value="1" />
+```
+
+- `by` — the counter name to subscribe to
+- `tag` — renders as that element with `data-counter` bound. Omit for a hidden input.
+- `value` — initial display value
+- `name` — form field name (hidden input mode)
 
 ### What about everything else?
 
