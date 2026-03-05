@@ -295,6 +295,14 @@ Two components wrap the counter protocol so you don't wire up `data-counter`, `d
 - `value` — initial display value
 - `name` — form field name (hidden input mode)
 
+### Why use this pattern?
+
+Why not? React diffs a virtual DOM against the real DOM on every single render — an entire tree comparison so a number can go from 3 to 4. Nobody blinks. But navigating a cached noop document through an iframe to parse a hash fragment? Suddenly that's weird.
+
+The counter protocol uses zero network requests, zero JavaScript frameworks, and exactly one browser primitive (iframe navigation) to do what every other solution does with more moving parts. The anchor tag already knows the next value. The iframe already fires onload. The hash is already a key-value store. Nothing here is invented — it's just assembled.
+
+Is this pattern superior to existing solutions? No. A React counter works fine. A vanilla JS `onclick` handler works fine. This isn't better — I just thought it would be cool to build the classic counter example as an HTMZ extension.
+
 ### What about everything else?
 
 Toggles cover the common cases — drawers, modals, tabs, accordions, dropdowns, tooltips — anything that's fundamentally "show this, hide that." Counters cover bounded numeric inputs. For everything beyond that — data fetching, form submission, real-time updates, anything that touches the server — HZML uses the server round-trip. Click a link, the server responds with HTML, HTMZ swaps it into the page. That's not a limitation, that's the architecture. The server is the state machine. The client is a viewport.
