@@ -1,7 +1,7 @@
 import { join, extname } from "path";
 import { readFile, access, readdir, stat, writeFile } from "fs/promises";
 import { parseRoute, executeScript, renderTemplate } from "./router";
-import { createToggleRegistry, type RenderContext } from "./state";
+import { createToggleRegistry, createDispatchRegistry, createDidCounter, type RenderContext } from "./state";
 import { htmz } from "./htmz";
 import type { DatabaseAdapter } from "./db";
 
@@ -264,20 +264,28 @@ function htmlResponse(body: string): Response {
 }
 
 async function renderRoute(match: RouteMatch, isPartial: boolean, request: Request): Promise<Response> {
-  const ctx: RenderContext = { toggleRegistry: createToggleRegistry() };
+  const ctx: RenderContext = {
+    toggleRegistry: createToggleRegistry(),
+    dispatchRegistry: createDispatchRegistry(),
+    nextDid: createDidCounter(),
+  };
   const source = await readFile(match.filePath, "utf-8");
   const route = parseRoute(source);
 
   let body: string;
 
   if (route.script) {
-    const raw = await executeScript(route.script, request, match.params, match.filePath, db);
+    const result = await executeScript(route.script, request, match.params, match.filePath, db);
 
-    if (raw?.__redirect) {
-      return Response.redirect(raw.__redirect, 302);
+    if (result.data?.__redirect) {
+      return Response.redirect(result.data.__redirect, 302);
     }
 
-    const data = await resolveData(raw);
+    for (const h of result.onHandlers) {
+      ctx.dispatchRegistry.registerManual(h.name, h.source);
+    }
+
+    const data = await resolveData(result.data);
     body = route.template ? renderTemplate(route.template, data, ctx) : "";
   } else {
     body = route.template ? renderTemplate(route.template, {}, ctx) : source;
@@ -294,7 +302,8 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
 
   if (isPartial) {
     const toggleInputs = ctx.toggleRegistry.emit();
-    return htmlResponse(`<div id="content">${toggleInputs}${body}</div>`);
+    const dispatchScripts = ctx.dispatchRegistry.emit();
+    return htmlResponse(`<div id="content">${toggleInputs}${body}${dispatchScripts}</div>`);
   }
 
   if (rootLayout) {
@@ -309,9 +318,10 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
   if (toggleInputs) {
     body = toggleInputs + '\n' + body;
   }
+  const dispatchScripts = ctx.dispatchRegistry.emit();
   const toggleCSS = generateToggleCSS(body);
   updateToggleManifest(body);
-  return htmlResponse(htmz(body, toggleCSS));
+  return htmlResponse(htmz(body, toggleCSS, dispatchScripts));
 }
 
 return async function handler(req: Request): Promise<Response> {

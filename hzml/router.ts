@@ -128,6 +128,54 @@ export async function loadComponents(projectDir?: string): Promise<void> {
     await loadFromDir(join(projectDir, "components"));
   }
 
+  componentCache['Dispatcher'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
+    const to = props.to as string;
+    const transform = props.transform as Function | undefined;
+    const value = props.value as string | undefined;
+    const children = Array.isArray(props.children)
+      ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
+      : (props.children || '');
+    const reserved = new Set(['to', 'value', 'transform', 'children']);
+    const attrs = Object.entries(props)
+      .filter(([k]) => !reserved.has(k))
+      .map(([k, v]) => k === 'class' ? ` class="${v}"` : ` ${k}="${v}"`)
+      .join('');
+
+    let did = '';
+    if (transform && ctx) {
+      did = ctx.nextDid();
+      ctx.dispatchRegistry.registerTransform(to, did, transform.toString());
+    }
+
+    let href = '#';
+    if (value !== undefined) {
+      href = `/noop.html?${encodeURIComponent(value)}#${to}=${encodeURIComponent(value)}`;
+    }
+
+    const didAttr = did ? ` data-did="${did}"` : '';
+    return `<a href="${href}" target="htmz" data-dispatcher="${to}"${didAttr}${attrs}>${children}</a>`;
+  };
+
+  componentCache['Dispatched'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
+    const by = props.by as string;
+    const tag = props.tag as string | undefined;
+    const value = props.value as string || '';
+    const name = props.name as string | undefined;
+    const cls = (props.class as string) || '';
+    const children = Array.isArray(props.children)
+      ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
+      : (props.children || '');
+
+    if (ctx && value) {
+      ctx.dispatchRegistry.registerInitialValue(by, value);
+    }
+
+    if (tag) {
+      return `<${tag} data-dispatched="${by}"${cls ? ` class="${cls}"` : ''}>${children || value}</${tag}>`;
+    }
+    return `<input data-dispatched="${by}" value="${value}" name="${name || by}" type="hidden">`;
+  };
+
   componentCache['Toggled'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
     const id = props.id as string;
     const name = props.name as string | undefined;
@@ -155,9 +203,15 @@ export async function loadComponents(projectDir?: string): Promise<void> {
 
 }
 
+interface DispatchHandler {
+  name: string;
+  source: string;
+}
+
 interface RouteContext {
   getHandler: RouteHandler | null;
   postHandler: RouteHandler | null;
+  onHandlers: DispatchHandler[];
 }
 
 const routeContexts: Record<string, RouteContext> = {};
@@ -167,20 +221,27 @@ function getRouteContext(script: string, filePath: string, db?: DatabaseAdapter)
 
   let getHandler: RouteHandler | null = null;
   let postHandler: RouteHandler | null = null;
+  const onHandlers: DispatchHandler[] = [];
 
   const get = (fn: RouteHandler) => { getHandler = fn; };
   const post = (fn: RouteHandler) => { postHandler = fn; };
   const redirect = (url: string) => ({ __redirect: url });
+  const on = (name: string, fn: Function) => { onHandlers.push({ name, source: fn.toString() }); };
 
   const clean = script.replace(/^import\s.*$/gm, "");
 
-  const hzml = { get, post, redirect, db };
+  const hzml = { get, post, redirect, db, on };
   const register = new Function("hzml", clean);
   register(hzml);
 
-  const ctx = { getHandler, postHandler };
+  const ctx = { getHandler, postHandler, onHandlers };
   routeContexts[filePath] = ctx;
   return ctx;
+}
+
+interface ScriptResult {
+  data: Record<string, unknown>;
+  onHandlers: DispatchHandler[];
 }
 
 export async function executeScript(
@@ -189,8 +250,8 @@ export async function executeScript(
   params: Record<string, string> = {},
   filePath: string = "",
   db?: DatabaseAdapter,
-): Promise<Record<string, unknown>> {
-  const { getHandler, postHandler } = getRouteContext(script, filePath, db);
+): Promise<ScriptResult> {
+  const { getHandler, postHandler, onHandlers } = getRouteContext(script, filePath, db);
 
   const method = request.method.toLowerCase();
 
@@ -199,12 +260,12 @@ export async function executeScript(
   if (method === "post" && postHandler) {
     const formData = await request.formData();
     req.body = Object.fromEntries(formData);
-    return await postHandler(req);
+    return { data: await postHandler(req), onHandlers };
   }
 
-  if (method === "get" && getHandler) return await getHandler(req);
+  if (method === "get" && getHandler) return { data: await getHandler(req), onHandlers };
 
-  return {};
+  return { data: {}, onHandlers };
 }
 
 const RESERVED = new Set([

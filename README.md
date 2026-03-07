@@ -1,12 +1,39 @@
 # HZML
 
-A micrometaframework built on [HTMZ](https://leanrada.com/htmz/) and [HTM](https://github.com/developit/htm). Server-rendered HTML with client-side reactivity using web primitives — no bundler, no virtual DOM, no hydration, no client-side JavaScript framework required.
+A micrometaframework built on [HTMZ](https://leanrada.com/htmz/) and [HTM](https://github.com/developit/htm). Server-rendered HTML with client-side reactivity using web primitives — no bundler, no virtual DOM, no hydration.
 
 ## How it works
 
-HZML uses a hidden iframe (the HTMZ pattern) for navigation. Links and forms target the iframe, the server decides whether to send a full page or a partial based on the browser's `Sec-Fetch-Dest` header. No custom JavaScript, no virtual DOM, no hydration.
+HZML uses a hidden `<iframe name="htmz">` for navigation. When a link or form targets that iframe, the browser loads the response into it. The iframe's `onload` handler finds every element with an ID in the response and replaces the matching element on the page, then updates the URL via `history.pushState`. No client-side JavaScript framework, no fetch calls — just native browser behavior.
 
-Routes are `.hzml` files with `<server>` and `<template>` blocks. `<server>` is where your server-side code lives (data loading, form handling). `<template>` is what gets rendered to HTML. Need client-side JavaScript? Just use `<script>` inside `<template>` — it passes through as normal HTML.
+The server decides whether to send a full page or a partial based on the browser's `Sec-Fetch-Dest` header. Routes are `.hzml` files with `<server>` and `<template>` blocks. `<server>` runs on the server (data loading, form handling). `<template>` renders to HTML.
+
+## What even is "state" anyway?
+
+A sidebar slides in. A tab switches. An accordion opens. For the last decade, the industry's answer to these interactions has been: download a JS file, construct a virtual representation of your document in memory, diff it against the previous version, and surgically patch the real DOM. All so a `<div>` can do something that looks awfully like `display: none` -> `display: block`.
+
+Real state management is a database transaction, a session token, a shopping cart persisted across tabs. But showing and hiding a panel? Highlighting the active tab? That's a boolean. The browser has had a native boolean state primitive since HTML 2.0 — `<input type="checkbox">`. It persists across interactions. It's queryable with CSS. It requires zero JavaScript to toggle.
+
+HZML takes this literally. Instead of shipping a reactivity engine to the client, we use what's already there:
+
+- **Hidden checkboxes** store boolean state (open/closed, visible/hidden)
+- **Hidden radio buttons** store enum state (which tab, which accordion item)
+- **Labels** dispatch state changes (clicking a label toggles its linked input)
+- **CSS `:has()`** reacts to state changes (if body has a checked #drawer, show the drawer)
+- **Noop iframe navigation** handles computed values (the anchor tag knows the next value, the iframe fires onload, the hash is a key-value store)
+
+No virtual DOM. No diffing. No re-rendering. No hydration. No `useState`, no `useEffect`, no `subscribe()`. The browser does all of it natively, and it's been able to for years.
+
+### The escalation ladder
+
+Not every interaction needs the same tool. HZML provides four tiers, each adding capability:
+
+1. **Toggled/Toggler** — boolean/enum, zero JS, CSS `:has()`
+2. **Dispatcher/Dispatched** — computed values, compiler-generated client JS
+3. **`hzml.on()` + Dispatcher/Dispatched** — custom client behavior, full handler control
+4. **Raw `<script>`** — escape hatch
+
+Toggles cover drawers, modals, tabs, accordions, dropdowns, tooltips — anything that's fundamentally "show this, hide that." Dispatcher covers quantity steppers, rating pickers, bounded inputs — anything that transforms a value. For everything beyond that — data fetching, form submission, real-time updates, anything that touches the server — HZML uses the server round-trip. Click a link, the server responds with HTML, HTMZ swaps it into the page. That's not a limitation, that's the architecture. The server is the state machine. The client is a viewport.
 
 ## Quick start
 
@@ -113,32 +140,24 @@ Add `layout.hzml` at any directory level. Layouts nest automatically — a route
 
 ## Components
 
-Components are `.hzml` files in `components/`. They're globally available in all templates — no imports needed.
+Components are `.hzml` files in `components/`. They're globally available in all templates — no imports needed. The `<//>` closing tag is HTM shorthand — it closes the nearest open component.
 
-Built-in components ship with the framework: **`Link`**, **`Form`**, **`Emitter`**, **`Listener`**, **`Toggled`**, **`Toggler`**, **`Stepper`**, and **`Stepped`**. The first two exist because of how HTMZ works under the hood.
+Built-in components ship with the framework:
 
-HTMZ uses a hidden `<iframe name="htmz">` for navigation. When a link or form targets that iframe, the browser loads the response into it. The iframe's `onload` handler finds every element with an ID in the response and replaces the matching element on the page, then updates the URL via `history.pushState`. No client-side JavaScript framework, no fetch calls — just native browser behavior.
-
-For this to work, every `<a>` and `<form>` in your app needs `target="htmz"`. Rather than making developers remember that on every element, the built-in components handle it:
+**Link** and **Form** exist because every `<a>` and `<form>` needs `target="htmz"` for iframe navigation. Rather than making developers remember that on every element, the components handle it:
 
 ```html
 <${Link} href="/about" class="text-blue-600">About<//>
-
 <!-- renders as: <a href="/about" target="htmz" class="text-blue-600">About</a> -->
-```
 
-```html
 <${Form} action="/todos">
   <input type="text" name="title" />
   <button type="submit">Add</button>
 <//>
-
 <!-- renders as: <form method="post" action="/todos" target="htmz">...</form> -->
 ```
 
-### Emitter / Listener
-
-Routes can push content into any part of the page — nav badges, sidebars, footers — using channel-based signals. An `Emitter` produces content, a `Listener` receives it. They're connected by a shared channel name.
+**Emitter** and **Listener** push content across page boundaries — nav badges, sidebars, footers — using channel-based signals:
 
 ```html
 <!-- in layout.hzml (the receiver) -->
@@ -150,9 +169,9 @@ Routes can push content into any part of the page — nav badges, sidebars, foot
 <//>
 ```
 
-On full page loads, the server merges emitter content into matching listeners and strips the emitters from the response. On partial loads (HTMZ navigation), the iframe's `onload` handler does the same merge client-side. Multiple listeners can subscribe to the same channel — no duplicate ID issues.
+On full page loads, the server merges emitter content into matching listeners and strips the emitters. On partial loads, the iframe's `onload` handler does the same merge client-side. Multiple listeners can subscribe to the same channel.
 
-The `<//>` closing tag is HTM shorthand — it closes the nearest open component.
+**Toggled**, **Toggler**, **Dispatcher**, and **Dispatched** handle client-side reactivity — see below.
 
 You can create your own components by adding `.hzml` files to a `components/` directory in your project root. They follow the same `<template>` format as routes.
 
@@ -174,38 +193,11 @@ ${items.map(item => html`<li>${item}</li>`)}
 <${MyComponent} prop="value">children<//>
 ```
 
-## Styling
-
-HZML is opinionated about styling. All CSS is render-blocking — the browser won't paint until it finishes parsing every stylesheet and style tag. Scattered CSS makes this worse. Tailwind produces a single, minimal CSS file containing only the classes you actually use, with zero runtime overhead — so it's built in, not optional. Write classes directly in templates. The build step scans `.hzml` files automatically.
-
-```bash
-bun run build          # one-time build
-bun run css:watch      # watch mode
-bun run dev            # server + css watch together
-```
-
 ## Client Reactivity
-
-### What even is "state" anyway?
-
-A sidebar slides in. A tab switches. An accordion opens. For the last decade, the industry's answer to these interactions has been: download a JS file, construct a virtual representation of your document in memory, diff it against the previous version, and surgically patch the real DOM. All so a `<div>` can do something that looks awfully like `display: none` -> `display: block`.
-
-Real state management is a database transaction, a session token, a shopping cart persisted across tabs. But showing and hiding a panel? Highlighting the active tab? That's a boolean. The browser has had a native boolean state primitive since HTML 2.0 — `<input type="checkbox">`. It persists across interactions. It's queryable with CSS. It requires zero JavaScript to toggle.
-
-HZML takes this literally. Instead of shipping a reactivity engine to the client, we use what's already there:
-
-- **Hidden checkboxes** store boolean state (open/closed, visible/hidden)
-- **Hidden radio buttons** store enum state (which tab, which accordion item)
-- **Labels** dispatch state changes (clicking a label toggles its linked input)
-- **CSS `:has()`** reacts to state changes (if body has a checked #drawer, show the drawer)
-
-No virtual DOM. No diffing. No re-rendering. No hydration. No `useState`, no `useEffect`, no `subscribe()`. The browser does all of it natively, and it's been able to for years. 
 
 ### Toggled and Toggler
 
-Two components handle client-side reactivity:
-
-**Toggled** — reactive content that responds to state. Creates a hidden input automatically and wraps its children in a div with reactive Tailwind classes.
+**Toggled** — reactive content that responds to boolean or enum state. Creates a hidden checkbox (or radio button) automatically and wraps its children with reactive Tailwind classes.
 
 ```html
 <${Toggled} id="drawer" ontrue="translate-x-0 opacity-100" onfalse="translate-x-full opacity-0"
@@ -232,7 +224,7 @@ Multiple Toggled components can share the same `id` — only one hidden input is
 - `off` — can only uncheck (becomes unclickable when unchecked)
 - Neither — toggles both directions
 
-### Tabs with radio buttons
+#### Tabs with radio buttons
 
 Pass `name` to group Toggled components as radio buttons. The browser enforces mutual exclusion — checking one unchecks the others. No JavaScript coordination needed.
 
@@ -248,64 +240,43 @@ Pass `name` to group Toggled components as radio buttons. The browser enforces m
 <//>
 ```
 
-### Counter (numeric state)
+### Dispatcher and Dispatched
 
-Toggles handle booleans. But some UI patterns need a number — quantity steppers, rating pickers, pagination. CSS can't do arithmetic, so HZML uses a minimal protocol: anchor tags that navigate a cached `/noop.html` route with a hash encoding the new value.
+**Dispatcher** — a trigger that computes a new value. The `transform` function receives the current value and returns the next value.
 
-```html
-<a data-counter="qty" data-step="-1" href="/noop.html?0#qty=0" target="htmz">-</a>
-<span data-counter="qty">1</span>
-<a data-counter="qty" data-step="1" href="/noop.html?2#qty=2" target="htmz">+</a>
-<input data-counter="qty" type="hidden" name="quantity" value="1" />
-```
+**Dispatched** — reactive content that displays the current value. Renders either a visible element (when `tag` is provided) or a hidden input (for form submission).
 
-- `data-counter` binds an element to a state key. The element's role is determined by its type: anchors with `data-step` are setters (hrefs recomputed on each click), `<input>` elements get their value updated, everything else gets `textContent` updated.
-- `data-min` / `data-max` on the display element enforces bounds.
-- Multiple steppers sharing the same counter name stay in sync.
-
-The state is deterministic — `qty + 1` is always known at click time. The href pre-computes the result, the iframe loads a cached noop document, and the `onload` handler parses the hash and updates the DOM. No server round-trip for trivial arithmetic.
-
-This is not a general-purpose reactivity system. It's for buffered server inputs — values that will eventually be sent to the server (add to cart, update quantity). The non-deterministic part (cart validation, inventory checks, discounts) is always the server round-trip via regular HTMZ navigation.
-
-### Stepper and Stepped
-
-Two components wrap the counter protocol so you don't wire up `data-counter`, `data-step`, and the noop href by hand:
-
-**Stepper** — dispatches a state change. Renders an anchor with the counter protocol wired up.
+The `to`/`by` channel connects them. The framework auto-generates the client-side update logic — no `<server>` block needed.
 
 ```html
-<${Stepper} target="qty" step="-1" initialValue="0">-<//>
-<${Stepper} target="qty" step="1" initialValue="2">+<//>
+<${Dispatcher} to="qty" transform=${v => v - 1}>-<//>
+<${Dispatched} by="qty" tag="span" value="1" class="text-2xl font-mono" />
+<${Dispatcher} to="qty" transform=${v => +v + 1}>+<//>
+<${Dispatched} by="qty" value="1" name="quantity" />
 ```
 
-- `target` — the counter name to update
-- `step` — how much to add/subtract per click
-- `initialValue` — the pre-computed result for the first click
+- `to` — the channel name. Connects this Dispatcher to Dispatched elements with the same `by`.
+- `transform` — a function `(currentValue) => nextValue`. The compiler serializes it and emits it as client-side code. Constraints live here — `transform=${v => Math.max(1, Math.min(10, +v + 1))}` enforces bounds.
+- `by` — the channel to subscribe to.
+- `tag` — renders as that element. Omit for a hidden input.
+- `value` — initial display value. The first Dispatched's value is the initial state for the channel.
+- `name` — form field name (hidden input mode).
 
-**Stepped** — subscribes to a counter's state. Renders either a visible element (when `tag` is provided) or a hidden input (for form submission).
+Multiple Dispatchers and Dispatched elements on the same channel stay in sync. One click updates every Dispatched element and recomputes every Dispatcher's next href.
 
-```html
-<${Stepped} by="qty" tag="span" value="1" />
+Values pass through as strings — transforms own their own typing. Use `v - 1` for subtraction (JS implicit coercion) or `+v + 1` for addition (explicit parse). String values work too: `transform=${() => "red"}`.
 
-<${Stepped} by="qty" name="quantity" value="1" />
+For cases that need full control beyond what `transform` provides, `hzml.on(name, callback)` in a `<server>` block registers a raw client-side handler as an escape hatch.
+
+## Styling
+
+Tailwind is built in, not optional. All CSS is render-blocking — scattered CSS makes this worse. Tailwind produces a single, minimal CSS file containing only the classes you actually use, with zero runtime overhead. Write classes directly in templates. The build step scans `.hzml` files automatically.
+
+```bash
+bun run build          # one-time build
+bun run css:watch      # watch mode
+bun run dev            # server + css watch together
 ```
-
-- `by` — the counter name to subscribe to
-- `tag` — renders as that element with `data-counter` bound. Omit for a hidden input.
-- `value` — initial display value
-- `name` — form field name (hidden input mode)
-
-### Why use this pattern?
-
-Why not? React diffs a virtual DOM against the real DOM on every single render — an entire tree comparison so a number can go from 3 to 4. Nobody blinks. But navigating a cached noop document through an iframe to parse a hash fragment? Suddenly that's weird.
-
-The counter protocol uses zero network requests, zero JavaScript frameworks, and exactly one browser primitive (iframe navigation) to do what every other solution does with more moving parts. The anchor tag already knows the next value. The iframe already fires onload. The hash is already a key-value store. Nothing here is invented — it's just assembled.
-
-Is this pattern superior to existing solutions? No. A React counter works fine. A vanilla JS `onclick` handler works fine. This isn't better — I just thought it would be cool to build the classic counter example as an HTMZ extension.
-
-### What about everything else?
-
-Toggles cover the common cases — drawers, modals, tabs, accordions, dropdowns, tooltips — anything that's fundamentally "show this, hide that." Counters cover bounded numeric inputs. For everything beyond that — data fetching, form submission, real-time updates, anything that touches the server — HZML uses the server round-trip. Click a link, the server responds with HTML, HTMZ swaps it into the page. That's not a limitation, that's the architecture. The server is the state machine. The client is a viewport.
 
 ## Database
 
@@ -367,78 +338,12 @@ Works with Bun, Deno, and Node.js.
 
 ## Editor support
 
-HZML includes a [Tree-sitter](https://tree-sitter.github.io/) grammar for syntax highlighting. Tree-sitter is built into Neovim — it parses `.hzml` files into a syntax tree and uses language injection to delegate TypeScript highlighting to `<server>` blocks and HTML highlighting to `<template>` blocks. No build step, no TextMate regexes — just a real parser.
+HZML includes a [Tree-sitter](https://tree-sitter.github.io/) grammar for syntax highlighting in Neovim. It parses `.hzml` files and uses language injection to delegate TypeScript highlighting to `<server>` blocks and HTML highlighting to `<template>` blocks.
 
-No VS Code extension yet. Tree-sitter gives us precise, context-aware highlighting with the right level of complexity for an opinionated framework. If someone wants to build a TextMate grammar or VS Code extension, PRs welcome.
-
-### Neovim setup
-
-#### With nvim-treesitter
-
-Add the parser config to your nvim-treesitter setup, pointing to your local clone:
-
-```lua
-local treesitter_parser_config = require("nvim-treesitter.parsers").get_parser_configs()
-
-treesitter_parser_config.hzml = {
-  install_info = {
-    url = "/path/to/hzml/tree-sitter-hzml",
-    files = {"src/parser.c", "src/scanner.c"},
-    branch = "main",
-  },
-}
-
-vim.treesitter.language.register("hzml", "hzml")
-vim.filetype.add({ extension = { hzml = "hzml" } })
-```
-
-Then run `:TSInstall hzml`.
-
-Copy the query files to your Neovim runtimepath:
-
-```bash
-mkdir -p ~/.local/share/nvim/site/queries/hzml
-cp tree-sitter-hzml/queries/hzml/* ~/.local/share/nvim/site/queries/hzml/
-```
-
-> **Note:** The `url` must point to the `tree-sitter-hzml` directory directly — not the parent repo. Using the GitHub URL won't work because the grammar lives in a subdirectory, and nvim-treesitter can't resolve it during compilation.
-
-#### Manual setup
-
-Requires [`tree-sitter-cli`](https://github.com/tree-sitter/tree-sitter/blob/master/cli/README.md) and a C compiler.
-
-```bash
-cd tree-sitter-hzml
-tree-sitter generate
-tree-sitter build --output parser/hzml.so
-```
-
-Copy the built parser and queries to your Neovim runtimepath:
-
-```bash
-mkdir -p ~/.local/share/nvim/site/parser
-cp parser/hzml.so ~/.local/share/nvim/site/parser/
-
-mkdir -p ~/.local/share/nvim/site/queries/hzml
-cp queries/hzml/* ~/.local/share/nvim/site/queries/hzml/
-
-mkdir -p ~/.config/nvim/ftdetect
-cp ftdetect/hzml.lua ~/.config/nvim/ftdetect/
-```
-
-Add to your Neovim config:
-
-```lua
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = "hzml",
-  callback = function(args)
-    pcall(vim.treesitter.start, args.buf, "hzml")
-  end,
-})
-```
+See [`tree-sitter-hzml/README.md`](tree-sitter-hzml/README.md) for setup instructions.
 
 ## Dependencies
 
-- [HTMZ](https://github.com/Kalabasa/htmz) — the world's greatest reactive framework, and the main inspiration for this project. One hidden iframe, zero JavaScript.
+- [HTMZ](https://github.com/Kalabasa/htmz) — the iframe navigation pattern that started it all
 - [HTM](https://github.com/developit/htm) — tagged template literals
-- [tailwindcss](https://tailwindcss.com) — ❤️
+- [tailwindcss](https://tailwindcss.com)

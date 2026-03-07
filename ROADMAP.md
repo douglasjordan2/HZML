@@ -30,9 +30,7 @@
 - Render-time toggle registry: per-request RenderContext threads through component tree, single input per unique ID — no dedup pass ✓
 - Toggled as programmatic component: register-then-emit replaces inline input + regex cleanup ✓
 - htmz shell extracted to hzml/htmz.ts: upstream dev pattern (<script> tag + window.htmz(this)), setTimeout wrapper, extensible function ✓
-- Counter protocol: deterministic numeric state via /noop.html route + hash (#key=value), data-counter binding, data-step for setters, data-min/data-max bounds, Map-based state store, synced multi-stepper support ✓
-- Stepper/Stepped components: componentize counter buttons (Stepper dispatches, Stepped subscribes, counter name is shared channel)
-- StepGroup: compound state transitions — wraps multiple Steppers sharing one <a> tag, each contributes a fragment segment (#key1=v1&key2=v2), single click updates multiple counters
+- hzml.on() + Dispatcher/Dispatched: generalized client-side state via compiler-aware handler registration, noop iframe dispatch table, Dispatcher triggers and Dispatched subscribes ✓
 - ID hashing: deterministic collision-free IDs (filepath-based) for component reuse across templates
 - Toggled v2: explore limits of :has() — nested state, state combinations, transition choreography
 - Research: what patterns genuinely need JS vs. what CSS :has() can handle

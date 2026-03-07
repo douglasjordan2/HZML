@@ -1,4 +1,4 @@
-export function htmz(body: string, head = ""): string {
+export function htmz(body: string, head = "", scripts = ""): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,28 +11,15 @@ export function htmz(body: string, head = ""): string {
 <body class="group/root">
   ${body}
   <script>
-    const state = new Map();
+    window.hzml = { on: function(name, fn) { window.hzml._h.set(name, fn); }, _h: new Map() };
 
     function htmz(frame) {
       if (frame.contentWindow.location.pathname === '/noop.html') {
-        frame.contentWindow.location.hash.slice(1).split('&').forEach((p) => {
-          const kv = p.split('=');
-          state.set(kv[0], +kv[1]);
+        frame.contentWindow.location.hash.slice(1).split('&').forEach(function(p) {
+          var kv = p.split('=');
+          var handler = window.hzml._h.get(kv[0]);
+          if (handler) handler(kv[1]);
         });
-
-        state.forEach((v, k) => {
-          const ref = document.querySelector('[data-counter="' + k + '"]:not([data-step]):not(input)');
-          const lo = +(ref?.dataset.min ?? -Infinity);
-          const hi = +(ref?.dataset.max ?? Infinity);
-          v = Math.max(lo, Math.min(hi, v));
-          state.set(k, v);
-          document.querySelectorAll('[data-counter="' + k + '"]').forEach((el) => {
-            if (el.dataset.step) el.href = '/noop.html?' + (v + +el.dataset.step) + '#' + k + '=' + (v + +el.dataset.step);
-            else if (el.tagName === 'INPUT') el.value = v;
-            else el.textContent = v;
-          });
-        });
-
         return;
       }
 
@@ -53,6 +40,7 @@ export function htmz(body: string, head = ""): string {
       });
     }
   </script>
+  ${scripts}
   <iframe hidden name="htmz" onload="window.htmz(this)"></iframe>
 </body>
 </html>`;

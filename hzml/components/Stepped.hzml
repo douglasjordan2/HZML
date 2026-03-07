@@ -1,7 +1,0 @@
-<template>
-  ${tag ?
-    `<${tag} class="${cls || ''}" data-counter="${by}">${value}</${tag}>` :
-    `<input data-counter="${by}" value="${value}" name="${name || by}" type="hidden" />`
-  }
-</template>
-

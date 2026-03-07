@@ -6,60 +6,59 @@
       <h2 class="text-xl font-semibold mb-4">Quantity Stepper</h2>
 
       <div class="flex items-center gap-3">
-        <${Stepper} 
-          target="qty"
-          initialValue="0" 
-          step="-1"
+        <${Dispatcher} to="qty" transform=${v => v - 1}
           class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer"
         >-<//>
-        <${Stepped} by="qty" tag="span" class="text-2xl font-mono w-8 text-center" value="1" />
-        <${Stepper} 
-          target="qty"
-          initialValue="2" 
-          step="+1"
+        <${Dispatched} by="qty" tag="span" value="1" class="text-2xl font-mono w-8 text-center" />
+        <${Dispatcher} to="qty" transform=${v => +v + 1}
           class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer"
         >+<//>
-        <${Stepped} by="qty" value="1" name="quantity" />
-        <input data-counter="qty" type="hidden" name="quantity" value="1" />
+        <${Dispatched} by="qty" value="1" name="quantity" />
       </div>
     </section>
 
     <section class="mb-12">
-      <h2 class="text-xl font-semibold mb-4">Bounded (1–10)</h2>
+      <h2 class="text-xl font-semibold mb-4">Bounded (1-10)</h2>
 
       <div class="flex items-center gap-3">
-        <a data-counter="bounded" data-step="-1" href="/noop.html?0#bounded=0" target="htmz"
-           class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">-</a>
-        <span data-counter="bounded" data-min="1" data-max="10" class="text-2xl font-mono w-8 text-center">1</span>
-        <a data-counter="bounded" data-step="1" href="/noop.html?2#bounded=2" target="htmz"
-           class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">+</a>
+        <${Dispatcher} to="bounded" transform=${v => Math.max(1, Math.min(10, v - 1))}
+          class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer"
+        >-<//>
+        <${Dispatched} by="bounded" tag="span" value="1" class="text-2xl font-mono w-8 text-center" />
+        <${Dispatcher} to="bounded" transform=${v => Math.max(1, Math.min(10, +v + 1))}
+          class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer"
+        >+<//>
       </div>
     </section>
 
     <section>
       <h2 class="text-xl font-semibold mb-4">Synced Steppers</h2>
-      <p class="text-gray-500 mb-4">Two steppers, same counter name. They stay in sync.</p>
+      <p class="text-gray-500 mb-4">Two steppers, same handler. They stay in sync.</p>
 
       <div class="flex gap-12">
         <div>
           <p class="text-sm text-gray-400 mb-2">Main</p>
           <div class="flex items-center gap-3">
-            <a data-counter="synced" data-step="-1" href="/noop.html?0#synced=0" target="htmz"
-               class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">-</a>
-            <span data-counter="synced" class="text-2xl font-mono w-8 text-center">1</span>
-            <a data-counter="synced" data-step="1" href="/noop.html?2#synced=2" target="htmz"
-               class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">+</a>
+            <${Dispatcher} to="synced" transform=${v => v - 1}
+              class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer"
+            >-<//>
+            <${Dispatched} by="synced" tag="span" value="1" class="text-2xl font-mono w-8 text-center" />
+            <${Dispatcher} to="synced" transform=${v => +v + 1}
+              class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer"
+            >+<//>
           </div>
         </div>
 
         <div>
           <p class="text-sm text-gray-400 mb-2">Sticky bar</p>
           <div class="flex items-center gap-3">
-            <a data-counter="synced" data-step="-1" href="/noop.html?0#synced=0" target="htmz"
-               class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">-</a>
-            <span data-counter="synced" class="text-2xl font-mono w-8 text-center">1</span>
-            <a data-counter="synced" data-step="1" href="/noop.html?2#synced=2" target="htmz"
-               class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer">+</a>
+            <${Dispatcher} to="synced" transform=${v => v - 1}
+              class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer"
+            >-<//>
+            <${Dispatched} by="synced" tag="span" value="1" class="text-2xl font-mono w-8 text-center" />
+            <${Dispatcher} to="synced" transform=${v => +v + 1}
+              class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded text-lg select-none hover:bg-gray-100 cursor-pointer"
+            >+<//>
           </div>
         </div>
       </div>
