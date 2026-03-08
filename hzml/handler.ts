@@ -175,12 +175,12 @@ async function resolveData(data: Record<string, unknown>): Promise<Record<string
 }
 
 function mergeChannels(body: string): string {
-  const emitterRe = /<span data-emit="([^"]+)" hidden>/g;
-  const emitters: Record<string, string> = {};
+  const fillRe = /<span data-fill="([^"]+)" hidden>/g;
+  const fills: Record<string, string> = {};
   const ranges: [number, number][] = [];
   let match;
 
-  while ((match = emitterRe.exec(body)) !== null) {
+  while ((match = fillRe.exec(body)) !== null) {
     const channel = match[1];
     const outerStart = match.index;
     const innerStart = outerStart + match[0].length;
@@ -190,9 +190,9 @@ function mergeChannels(body: string): string {
       if (body.startsWith('</span>', i)) {
         depth--;
         if (depth === 0) {
-          emitters[channel] = body.slice(innerStart, i).trim();
+          fills[channel] = body.slice(innerStart, i).trim();
           ranges.push([outerStart, i + 7]);
-          emitterRe.lastIndex = i + 7;
+          fillRe.lastIndex = i + 7;
           break;
         }
         i += 7;
@@ -212,8 +212,8 @@ function mergeChannels(body: string): string {
   }
 
   return result.replace(
-    /<span data-listen="([^"]+)"><\/span>/g,
-    (m, ch) => ch in emitters ? `<span data-listen="${ch}">${emitters[ch]}</span>` : m
+    /<span data-slot="([^"]+)"><\/span>/g,
+    (m, ch) => ch in fills ? `<span data-slot="${ch}">${fills[ch]}</span>` : m
   );
 }
 

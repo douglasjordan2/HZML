@@ -3,7 +3,7 @@
     <nav class="flex gap-4 mb-8 pb-4 border-b border-gray-200">
       <${Link} href="/" class="text-gray-600 font-medium no-underline hover:text-black">Home<//>
       <${Link} href="/about" class="text-gray-600 font-medium no-underline hover:text-black">About<//>
-      <${Link} href="/todos" class="text-gray-600 font-medium no-underline hover:text-black">Todos <${Listener} channel="todo-count" /><//>
+      <${Link} href="/todos" class="text-gray-600 font-medium no-underline hover:text-black">Todos <${Slot} channel="todo-count" /><//>
       <${Link} href="/blog" class="text-gray-600 font-medium no-underline hover:text-black">Blog<//>
       <${Link} href="/toggle-demo" class="text-gray-600 font-medium no-underline hover:text-black">Toggles<//>
       <${Link} href="/counter-demo" class="text-gray-600 font-medium no-underline hover:text-black">Counter<//>

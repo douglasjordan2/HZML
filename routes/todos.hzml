@@ -43,7 +43,7 @@
     `}
   </div>
 
-  <${Emitter} channel="todo-count">
+  <${Fill} channel="todo-count">
     ${todos.length > 0 && html`
       <span class="bg-black text-white text-xs rounded-full px-1.5 py-0.5">${todos.length}</span>
     `}

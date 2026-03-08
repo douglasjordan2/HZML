@@ -1,3 +1,0 @@
-<template>
-  <span data-emit="${channel}" hidden>${children}</span>
-</template>

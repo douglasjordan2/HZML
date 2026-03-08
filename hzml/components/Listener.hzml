@@ -1,3 +1,0 @@
-<template>
-  <span data-listen="${channel}">${children}</span>
-</template>

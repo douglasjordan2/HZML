@@ -157,21 +157,21 @@ Built-in components ship with the framework:
 <!-- renders as: <form method="post" action="/todos" target="htmz">...</form> -->
 ```
 
-**Emitter** and **Listener** push content across page boundaries — nav badges, sidebars, footers — using channel-based signals:
+**Slot** and **Fill** project content across page boundaries — nav badges, sidebars, footers — using named channels:
 
 ```html
-<!-- in layout.hzml (the receiver) -->
-<${Listener} channel="todo-count" />
+<!-- in layout.hzml (the hole) -->
+<${Slot} channel="todo-count" />
 
-<!-- in todos.hzml (the sender) -->
-<${Emitter} channel="todo-count">
+<!-- in todos.hzml (the content) -->
+<${Fill} channel="todo-count">
   <span class="badge">${todos.length}</span>
 <//>
 ```
 
-On full page loads, the server merges emitter content into matching listeners and strips the emitters. On partial loads, the iframe's `onload` handler does the same merge client-side. Multiple listeners can subscribe to the same channel.
+On full page loads, the server merges fill content into matching slots and strips the fills. On partial loads, the iframe's `onload` handler does the same merge client-side. Multiple slots can subscribe to the same channel.
 
-**Toggled**, **Toggler**, **Dispatcher**, and **Dispatched** handle client-side reactivity — see below.
+**Toggled**, **Toggler**, **Dispatcher**, and **Dispatched** handle client-side reactivity — see below. Slot/Fill handles cross-route content projection (where content appears); Dispatcher/Dispatched handles local interactive state (what the current value is).
 
 You can create your own components by adding `.hzml` files to a `components/` directory in your project root. They follow the same `<template>` format as routes.
 

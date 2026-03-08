@@ -8,11 +8,11 @@
 - htm templating with server-side string rendering
 - get()/post() handlers in route scripts
 - Form body parsing
-- .hzml components (Link, Form, Emitter, Listener)
+- .hzml components (Link, Form, Slot, Fill)
 - Tailwind CSS build step
 - HTMZ iframe navigation with Sec-Fetch-Dest detection
 - Multi-target element swapping (real HTMZ pattern — any element with a matching ID gets replaced)
-- Emitter/Listener channels for cross-page reactivity (replaces Swap — no duplicate IDs, multiple listeners per channel)
+- Slot/Fill channels for cross-page content projection (replaces Swap — no duplicate IDs, multiple slots per channel)
 - Route context caching (server block state persists across requests)
 - Static file serving from public/
 - redirect() works end-to-end (full page + HTMZ iframe, 302 preserves Sec-Fetch-Dest)

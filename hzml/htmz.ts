@@ -30,8 +30,8 @@ export function htmz(body: string, head = "", scripts = ""): string {
           document.getElementById(e.id)?.replaceWith(e)
         );
 
-        document.querySelectorAll('[data-emit]').forEach(e =>
-          document.querySelectorAll('[data-listen="' + e.dataset.emit + '"]').forEach(t =>
+        document.querySelectorAll('[data-fill]').forEach(e =>
+          document.querySelectorAll('[data-slot="' + e.dataset.fill + '"]').forEach(t =>
             t.innerHTML = e.innerHTML
           )
         );
