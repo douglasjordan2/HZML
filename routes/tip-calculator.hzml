@@ -1,0 +1,76 @@
+<script>
+  function tipCalc(channel, value, state) {
+    channel.forEach(function(el) {
+      if (el.dataset.value === value) {
+        el.className = 'px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-black text-white';
+      } else {
+        el.className = 'px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700';
+      }
+    });
+
+    const tip = +state.bill * +state.pct / 100;
+    dispatch("tip", "$" + tip.toFixed(2));
+
+    const total = +state.bill + tip;
+    dispatch("total", "$" + total.toFixed(2));
+
+    const pp = total / +state.party;
+    dispatch("pp", "$" + pp.toFixed(2));
+  }
+</script>
+
+<template>
+  <div>
+    <h1 class="text-3xl font-bold mb-6">Tip Calculator</h1>
+
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Bill Amount</h2>
+      <div class="flex flex-wrap gap-2">
+        <${Dispatcher} to="bill" value="25" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">$25<//>
+        <${Dispatcher} to="bill" value="50" on=${tipCalc} class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-black text-white">$50<//>
+        <${Dispatcher} to="bill" value="75" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">$75<//>
+        <${Dispatcher} to="bill" value="100" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">$100<//>
+        <${Dispatcher} to="bill" value="150" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">$150<//>
+      </div>
+    </section>
+
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Tip Percentage</h2>
+      <div class="flex flex-wrap gap-2">
+        <${Dispatcher} to="pct" value="15" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">15%<//>
+        <${Dispatcher} to="pct" value="18" on=${tipCalc} class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-black text-white">18%<//>
+        <${Dispatcher} to="pct" value="20" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">20%<//>
+        <${Dispatcher} to="pct" value="25" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">25%<//>
+      </div>
+    </section>
+
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Party Size</h2>
+      <div class="flex flex-wrap gap-2">
+        <${Dispatcher} to="party" value="1" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">1<//>
+        <${Dispatcher} to="party" value="2" on=${tipCalc} class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-black text-white">2<//>
+        <${Dispatcher} to="party" value="3" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">3<//>
+        <${Dispatcher} to="party" value="4" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">4<//>
+        <${Dispatcher} to="party" value="5" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">5<//>
+        <${Dispatcher} to="party" value="6" class="px-4 py-2 rounded text-sm font-medium cursor-pointer no-underline bg-gray-100 hover:bg-gray-200 text-gray-700">6<//>
+      </div>
+    </section>
+
+    <section class="bg-gray-50 rounded-lg p-6">
+      <div class="grid grid-cols-3 gap-4 text-center">
+        <div>
+          <p class="text-sm text-gray-500 mb-1">Tip</p>
+          <p class="text-2xl font-bold"><${Dispatched} by="tip" tag="span">$9.00<//></p>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500 mb-1">Total</p>
+          <p class="text-2xl font-bold"><${Dispatched} by="total" tag="span">$59.00<//></p>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500 mb-1">Per Person</p>
+          <p class="text-2xl font-bold"><${Dispatched} by="pp" tag="span">$29.50<//></p>
+        </div>
+      </div>
+    </section>
+  </div>
+</template>

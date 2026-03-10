@@ -8,8 +8,8 @@ interface HzmlOptions {
   db?: { provider?: DatabaseAdapter | "sqlite"; path?: string };
 }
 
-export default async function hzml(options: number | HzmlOptions = 4965) {
-  const port = typeof options === "number" ? options : (options.port ?? 4965);
+export default async function hzml(options: HzmlOptions) {
+  const port = options.port ?? 4965;
   const dbConfig = typeof options === "number" ? undefined : options.db;
 
   let db: DatabaseAdapter | undefined;

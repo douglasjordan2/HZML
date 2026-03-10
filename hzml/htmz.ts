@@ -36,6 +36,12 @@ export function htmz(body: string, head = "", scripts = ""): string {
           )
         );
 
+        document.getElementById('content')?.querySelectorAll('script').forEach(function(old) {
+          var s = document.createElement('script');
+          s.textContent = old.textContent;
+          old.parentNode.replaceChild(s, old);
+        });
+
         history.pushState(null, '', frame.contentWindow.location.pathname);
       });
     }

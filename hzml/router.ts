@@ -19,17 +19,46 @@ interface HzmlRequest {
 
 interface ParsedRoute {
   script: string;
+  clientScript: string;
   template: string;
 }
 
 export function parseRoute(source: string): ParsedRoute {
   const scriptMatch = source.match(/<server>([\s\S]*?)<\/server>/);
+  const clientScriptMatch = source.match(/<script>([\s\S]*?)<\/script>/);
   const templateMatch = source.match(/<template>([\s\S]*?)<\/template>/);
 
   return {
     script: scriptMatch ? scriptMatch[1].trim() : "",
+    clientScript: clientScriptMatch ? clientScriptMatch[1].trim() : "",
     template: templateMatch ? templateMatch[1].trim() : "",
   };
+}
+
+export function parseClientFunctions(source: string): Record<string, Function> {
+  const fns: Record<string, Function> = {};
+  const re = /function\s+(\w+)\s*\(([^)]*)\)\s*\{/g;
+  let match;
+
+  while ((match = re.exec(source)) !== null) {
+    const name = match[1];
+    const params = match[2];
+    const bodyStart = match.index + match[0].length;
+
+    let depth = 1;
+    let i = bodyStart;
+    while (i < source.length && depth > 0) {
+      if (source[i] === '{') depth++;
+      else if (source[i] === '}') depth--;
+      i++;
+    }
+    const body = source.slice(bodyStart, i - 1);
+    fns[name] = new Function(`return function(${params}) {${body}}`)();
+
+    re.lastIndex = i;
+  }
+
+  return fns;
 }
 
 const componentCache: Record<string, ComponentFn> = {};
@@ -131,11 +160,12 @@ export async function loadComponents(projectDir?: string): Promise<void> {
   componentCache['Dispatcher'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
     const to = props.to as string;
     const transform = props.transform as Function | undefined;
+    const on = props.on as Function | undefined;
     const value = props.value as string | undefined;
     const children = Array.isArray(props.children)
       ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
       : (props.children || '');
-    const reserved = new Set(['to', 'value', 'transform', 'children']);
+    const reserved = new Set(['to', 'value', 'transform', 'on', 'children']);
     const attrs = Object.entries(props)
       .filter(([k]) => !reserved.has(k))
       .map(([k, v]) => k === 'class' ? ` class="${v}"` : ` ${k}="${v}"`)
@@ -147,13 +177,21 @@ export async function loadComponents(projectDir?: string): Promise<void> {
       ctx.dispatchRegistry.registerTransform(to, did, transform.toString());
     }
 
+    if (on && ctx) {
+      ctx.dispatchRegistry.registerOn(to, on.toString());
+      if (value !== undefined) {
+        ctx.dispatchRegistry.registerInitialValue(to, value);
+      }
+    }
+
     let href = '#';
     if (value !== undefined) {
       href = `/noop.html?${encodeURIComponent(value)}#${to}=${encodeURIComponent(value)}`;
     }
 
     const didAttr = did ? ` data-did="${did}"` : '';
-    return `<a href="${href}" target="htmz" data-dispatcher="${to}"${didAttr}${attrs}>${children}</a>`;
+    const dataValueAttr = value !== undefined ? ` data-value="${value}"` : '';
+    return `<a href="${href}" target="htmz" data-dispatcher="${to}"${dataValueAttr}${didAttr}${attrs}>${children}</a>`;
   };
 
   componentCache['Dispatched'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
