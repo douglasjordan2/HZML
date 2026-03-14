@@ -1,0 +1,9 @@
+<loader>
+  const rows = hzml.db.query("SELECT COUNT(*) as count FROM todos")
+  const count = rows[0]?.count || 0
+  return { count }
+</loader>
+
+<template>
+  <span class="${cls || ''}">${count} todo${count !== 1 ? 's' : ''}</span>
+</template>

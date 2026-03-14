@@ -218,7 +218,29 @@ Loaders can also return a raw string to replace the entire component output, whi
 </template>
 ```
 
-Loaders run on every render — they're synchronous and have no access to `hzml.db` or request context. They're for deriving template variables from props, not for data fetching.
+Loaders have access to `hzml.db` for database queries, making components fully self-contained — a component can own both its data and its rendering:
+
+```html
+<!-- components/TodoCount.hzml -->
+<loader>
+  const rows = hzml.db.query("SELECT COUNT(*) as count FROM todos")
+  const count = rows[0]?.count || 0
+  return { count }
+</loader>
+
+<template>
+  <span class="${cls || ''}">${count} todo${count !== 1 ? 's' : ''}</span>
+</template>
+```
+
+```html
+<${TodoCount} class="font-bold" />
+<!-- renders as: <span class="font-bold">3 todos</span> -->
+```
+
+No route-level loader needed. No prop drilling. The component queries what it needs, every time it renders.
+
+Loaders are synchronous and have no access to `hzml.get()`, `hzml.post()`, `hzml.redirect()`, or the request object — those are `<server>` block concepts for routes. The `<loader>` name is the convention: loaders load and transform data, servers handle HTTP.
 
 ## Templating
 
@@ -344,7 +366,7 @@ bun run dev            # server + css watch together
 
 ## Database
 
-SQLite is the default database — zero config, zero dependencies on Bun. Available as `hzml.db` in server blocks:
+SQLite is the default database — zero config, zero dependencies on Bun. Available as `hzml.db` in both `<server>` blocks (routes) and `<loader>` blocks (components):
 
 ```html
 <server>

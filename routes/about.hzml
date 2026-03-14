@@ -21,5 +21,7 @@
     <ul class="space-y-2">
       ${features.map(f => html`<li class="text-gray-600">— ${f.name}</li>`)}
     </ul>
+
+    <p class="mt-6 text-sm text-gray-400">You currently have <${TodoCount} class="font-semibold" /> in the database.</p>
   </div>
 </template>

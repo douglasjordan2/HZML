@@ -84,26 +84,6 @@ Template with components
     (template_content)))
 
 ================
-Loader and template component
-================
-
-<loader>
-  if (!children) return { children: "default content" }
-</loader>
-
-<template>
-  <div>${children}</div>
-</template>
-
----
-
-(source_file
-  (loader_block
-    (loader_content))
-  (template_block
-    (template_content)))
-
-================
 Empty blocks
 ================
 
@@ -116,3 +96,46 @@ Empty blocks
 (source_file
   (server_block)
   (template_block))
+
+================
+Loader and template (component)
+================
+
+<loader>
+  const items = hzml.db.query("SELECT * FROM items WHERE category = ?", [category])
+  return { items }
+</loader>
+
+<template>
+  <ul>
+    ${items.map(item => html`<li>${item.name}</li>`)}
+  </ul>
+</template>
+
+---
+
+(source_file
+  (loader_block
+    (loader_content))
+  (template_block
+    (template_content)))
+
+================
+Loader only (component with string return)
+================
+
+<loader>
+  if (!id) return "<p>No ID provided</p>"
+</loader>
+
+<template>
+  <p>${id}</p>
+</template>
+
+---
+
+(source_file
+  (loader_block
+    (loader_content))
+  (template_block
+    (template_content)))

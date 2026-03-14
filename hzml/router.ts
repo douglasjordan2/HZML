@@ -131,8 +131,9 @@ async function loadFromDir(dir: string) {
       if (loaderCode) {
         const keys = Object.keys(data).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
         const values = keys.map(k => data[k]);
-        const loaderFn = new Function(...keys, `{\n${loaderCode}\n}`);
-        const result = loaderFn(...values);
+        const hzml = { db: ctx?.db };
+        const loaderFn = new Function('hzml', ...keys, `{\n${loaderCode}\n}`);
+        const result = loaderFn(hzml, ...values);
         if (typeof result === "string") return result;
         if (typeof result === "object" && result !== null) Object.assign(data, result);
       }
@@ -306,8 +307,9 @@ export async function reloadComponent(name: string, filePath: string) {
     if (loaderCode) {
       const keys = Object.keys(data).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
       const values = keys.map(k => data[k]);
-      const loaderFn = new Function(...keys, loaderCode);
-      const result = loaderFn(...values);
+      const hzml = { db: ctx?.db };
+      const loaderFn = new Function('hzml', ...keys, loaderCode);
+      const result = loaderFn(hzml, ...values);
       if (typeof result === "string") return result;
       if (typeof result === "object" && result !== null) Object.assign(data, result);
     }

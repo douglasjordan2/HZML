@@ -1,5 +1,6 @@
 export interface RenderContext {
   toggleRegistry: ToggleRegistry;
+  db?: import("./db").DatabaseAdapter;
 }
 
 interface ToggleEntry {

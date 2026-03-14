@@ -126,6 +126,7 @@ function htmlResponse(body: string): Response {
 async function renderRoute(match: RouteMatch, isPartial: boolean, request: Request): Promise<Response> {
   const ctx: RenderContext = {
     toggleRegistry: createToggleRegistry(),
+    db,
   };
   const source = await readFile(match.filePath, "utf-8");
   const route = parseRoute(source);
