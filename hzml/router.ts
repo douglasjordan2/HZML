@@ -35,32 +35,6 @@ export function parseRoute(source: string): ParsedRoute {
   };
 }
 
-export function parseClientFunctions(source: string): Record<string, Function> {
-  const fns: Record<string, Function> = {};
-  const re = /function\s+(\w+)\s*\(([^)]*)\)\s*\{/g;
-  let match;
-
-  while ((match = re.exec(source)) !== null) {
-    const name = match[1];
-    const params = match[2];
-    const bodyStart = match.index + match[0].length;
-
-    let depth = 1;
-    let i = bodyStart;
-    while (i < source.length && depth > 0) {
-      if (source[i] === '{') depth++;
-      else if (source[i] === '}') depth--;
-      i++;
-    }
-    const body = source.slice(bodyStart, i - 1);
-    fns[name] = new Function(`return function(${params}) {${body}}`)();
-
-    re.lastIndex = i;
-  }
-
-  return fns;
-}
-
 const componentCache: Record<string, ComponentFn> = {};
 
 const JS_GLOBALS = new Set([
@@ -157,44 +131,36 @@ export async function loadComponents(projectDir?: string): Promise<void> {
     await loadFromDir(join(projectDir, "components"));
   }
 
-  componentCache['Dispatcher'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
+  componentCache['Dispatcher'] = (props: Record<string, unknown>) => {
     const to = props.to as string;
     const transform = props.transform as Function | undefined;
-    const on = props.on as Function | undefined;
     const value = props.value as string | undefined;
+    const then = props.then as string | undefined;
+    const tag = (props.tag as string) || 'button';
     const children = Array.isArray(props.children)
       ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
       : (props.children || '');
-    const reserved = new Set(['to', 'value', 'transform', 'on', 'children']);
+    const reserved = new Set(['to', 'value', 'transform', 'then', 'tag', 'children']);
     const attrs = Object.entries(props)
       .filter(([k]) => !reserved.has(k))
       .map(([k, v]) => k === 'class' ? ` class="${v}"` : ` ${k}="${v}"`)
       .join('');
 
-    let did = '';
-    if (transform && ctx) {
-      did = ctx.nextDid();
-      ctx.dispatchRegistry.registerTransform(to, did, transform.toString());
+    let onclick = '';
+    if (transform) {
+      onclick = `hzml.set('${to}',${transform.toString()})`;
+    } else if (value !== undefined) {
+      const escaped = String(value).replace(/'/g, "\\'");
+      onclick = `hzml.set('${to}','${escaped}')`;
     }
+    if (then) onclick += ';' + then;
 
-    if (on && ctx) {
-      ctx.dispatchRegistry.registerOn(to, on.toString());
-      if (value !== undefined) {
-        ctx.dispatchRegistry.registerInitialValue(to, value);
-      }
-    }
-
-    let href = '#';
-    if (value !== undefined) {
-      href = `/noop.html?${encodeURIComponent(value)}#${to}=${encodeURIComponent(value)}`;
-    }
-
-    const didAttr = did ? ` data-did="${did}"` : '';
-    const dataValueAttr = value !== undefined ? ` data-value="${value}"` : '';
-    return `<a href="${href}" target="htmz" data-dispatcher="${to}"${dataValueAttr}${didAttr}${attrs}>${children}</a>`;
+    const onclickAttr = onclick ? ` onclick="${onclick}"` : '';
+    const typeAttr = tag === 'button' ? ' type="button"' : '';
+    return `<${tag}${typeAttr}${onclickAttr}${attrs}>${children}</${tag}>`;
   };
 
-  componentCache['Dispatched'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
+  componentCache['Dispatched'] = (props: Record<string, unknown>) => {
     const by = props.by as string;
     const tag = props.tag as string | undefined;
     const value = props.value as string || '';
@@ -204,14 +170,38 @@ export async function loadComponents(projectDir?: string): Promise<void> {
       ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
       : (props.children || '');
 
-    if (ctx && value) {
-      ctx.dispatchRegistry.registerInitialValue(by, value);
+    if (tag) {
+      return `<${tag} data-d="${by}"${cls ? ` class="${cls}"` : ''}>${children || value}</${tag}>`;
     }
+    return `<input data-d="${by}" value="${value}" name="${name || by}" type="hidden">`;
+  };
+
+  componentCache['Toggler'] = (props: Record<string, unknown>) => {
+    const id = props.id as string;
+    const on = props.on;
+    const off = props.off;
+    const tag = props.tag as string | undefined;
+    const ontrue = (props.ontrue as string) || '';
+    const onfalse = (props.onfalse as string) || '';
+    const cls = (props.class as string) || '';
+    const children = Array.isArray(props.children)
+      ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
+      : (props.children || '');
+
+    const dirAttr = on !== undefined ? ' data-toggle-dir="on"'
+      : off !== undefined ? ' data-toggle-dir="off"'
+      : '';
 
     if (tag) {
-      return `<${tag} data-dispatched="${by}"${cls ? ` class="${cls}"` : ''}>${children || value}</${tag}>`;
+      const classes = [
+        ...ontrue.split(' ').filter(Boolean).map(c => `group-has-[#${id}:checked]/root:${c}`),
+        ...onfalse.split(' ').filter(Boolean),
+        ...cls.split(' ').filter(Boolean),
+      ].join(' ');
+      return `<${tag} class="${classes}"><label for="${id}"${dirAttr} class="contents cursor-pointer">${children}</label></${tag}>`;
     }
-    return `<input data-dispatched="${by}" value="${value}" name="${name || by}" type="hidden">`;
+
+    return `<label for="${id}"${dirAttr}${cls ? ` class="${cls}"` : ''}>${children}</label>`;
   };
 
   componentCache['Toggled'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
@@ -241,15 +231,9 @@ export async function loadComponents(projectDir?: string): Promise<void> {
 
 }
 
-interface DispatchHandler {
-  name: string;
-  source: string;
-}
-
 interface RouteContext {
   getHandler: RouteHandler | null;
   postHandler: RouteHandler | null;
-  onHandlers: DispatchHandler[];
 }
 
 const routeContexts: Record<string, RouteContext> = {};
@@ -259,27 +243,20 @@ function getRouteContext(script: string, filePath: string, db?: DatabaseAdapter)
 
   let getHandler: RouteHandler | null = null;
   let postHandler: RouteHandler | null = null;
-  const onHandlers: DispatchHandler[] = [];
 
   const get = (fn: RouteHandler) => { getHandler = fn; };
   const post = (fn: RouteHandler) => { postHandler = fn; };
   const redirect = (url: string) => ({ __redirect: url });
-  const on = (name: string, fn: Function) => { onHandlers.push({ name, source: fn.toString() }); };
 
   const clean = script.replace(/^import\s.*$/gm, "");
 
-  const hzml = { get, post, redirect, db, on };
+  const hzml = { get, post, redirect, db };
   const register = new Function("hzml", clean);
   register(hzml);
 
-  const ctx = { getHandler, postHandler, onHandlers };
+  const ctx = { getHandler, postHandler };
   routeContexts[filePath] = ctx;
   return ctx;
-}
-
-interface ScriptResult {
-  data: Record<string, unknown>;
-  onHandlers: DispatchHandler[];
 }
 
 export async function executeScript(
@@ -288,8 +265,8 @@ export async function executeScript(
   params: Record<string, string> = {},
   filePath: string = "",
   db?: DatabaseAdapter,
-): Promise<ScriptResult> {
-  const { getHandler, postHandler, onHandlers } = getRouteContext(script, filePath, db);
+): Promise<Record<string, unknown>> {
+  const { getHandler, postHandler } = getRouteContext(script, filePath, db);
 
   const method = request.method.toLowerCase();
 
@@ -298,12 +275,12 @@ export async function executeScript(
   if (method === "post" && postHandler) {
     const formData = await request.formData();
     req.body = Object.fromEntries(formData);
-    return { data: await postHandler(req), onHandlers };
+    return await postHandler(req);
   }
 
-  if (method === "get" && getHandler) return { data: await getHandler(req), onHandlers };
+  if (method === "get" && getHandler) return await getHandler(req);
 
-  return { data: {}, onHandlers };
+  return {};
 }
 
 const RESERVED = new Set([

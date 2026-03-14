@@ -11,18 +11,20 @@ export function htmz(body: string, head = "", scripts = ""): string {
 <body class="group/root">
   ${body}
   <script>
-    window.hzml = { on: function(name, fn) { window.hzml._h.set(name, fn); }, _h: new Map() };
+    window.hzml = {
+      get: function(name) {
+        var el = document.querySelector('[data-d="' + name + '"]');
+        return el ? (el.tagName === 'INPUT' ? el.value : el.textContent) : '';
+      },
+      set: function(name, fn) {
+        var v = typeof fn === 'function' ? fn(hzml.get(name)) : fn;
+        document.querySelectorAll('[data-d="' + name + '"]').forEach(function(e) {
+          if (e.tagName === 'INPUT') e.value = v; else e.textContent = v;
+        });
+      }
+    };
 
     function htmz(frame) {
-      if (frame.contentWindow.location.pathname === '/noop.html') {
-        frame.contentWindow.location.hash.slice(1).split('&').forEach(function(p) {
-          var kv = p.split('=');
-          var handler = window.hzml._h.get(kv[0]);
-          if (handler) handler(kv[1]);
-        });
-        return;
-      }
-
       if (!frame.contentDocument || !frame.contentDocument.body.childNodes.length) return;
 
       setTimeout(() => {

@@ -20,20 +20,20 @@ HZML takes this literally. Instead of shipping a reactivity engine to the client
 - **Hidden radio buttons** store enum state (which tab, which accordion item)
 - **Labels** dispatch state changes (clicking a label toggles its linked input)
 - **CSS `:has()`** reacts to state changes (if body has a checked #drawer, show the drawer)
-- **Noop iframe navigation** handles computed values (the anchor tag knows the next value, the iframe fires onload, the hash is a key-value store)
+- **`onclick` + `hzml.set()`** handles computed values (10 lines of client JS in the shell — buttons call transforms directly, no iframe round-trip)
 
 No virtual DOM. No diffing. No re-rendering. No hydration. No `useState`, no `useEffect`, no `subscribe()`. The browser does all of it natively, and it's been able to for years.
 
 ### The escalation ladder
 
-Not every interaction needs the same tool. HZML provides four tiers, each adding capability:
+Not every interaction needs the same tool. HZML provides three tiers, each adding capability:
 
 1. **Toggled/Toggler** — boolean/enum, zero JS, CSS `:has()`
-2. **Dispatcher/Dispatched** — computed values, compiler-generated client JS
-3. **`hzml.on()` + Dispatcher/Dispatched** — custom client behavior, full handler control
-4. **Raw `<script>`** — escape hatch
+2. **Dispatcher/Dispatched** — computed values, minimal client JS (`onclick` + `hzml.set()`)
+3. **`<script>` + `hzml.get()`/`hzml.set()`** — cross-channel logic, custom client behavior
+4. **HTMZ navigation** — server state, forms, data mutations
 
-Toggles cover drawers, modals, tabs, accordions, dropdowns, tooltips — anything that's fundamentally "show this, hide that." Dispatcher covers quantity steppers, rating pickers, bounded inputs — anything that transforms a value. For everything beyond that — data fetching, form submission, real-time updates, anything that touches the server — HZML uses the server round-trip. Click a link, the server responds with HTML, HTMZ swaps it into the page. That's not a limitation, that's the architecture. The server is the state machine. The client is a viewport.
+Toggles cover drawers, modals, tabs, accordions, dropdowns, tooltips — anything that's fundamentally "show this, hide that." Dispatcher covers quantity steppers, rating pickers, bounded inputs — anything that transforms a value. `<script>` blocks with `hzml.get()`/`hzml.set()` handle cross-channel dependencies like calculators. For everything beyond that — data fetching, form submission, real-time updates, anything that touches the server — HZML uses the server round-trip. Click a link, the server responds with HTML, HTMZ swaps it into the page. That's not a limitation, that's the architecture. The server is the state machine. The client is a viewport.
 
 ## Quick start
 
@@ -242,11 +242,11 @@ Pass `name` to group Toggled components as radio buttons. The browser enforces m
 
 ### Dispatcher and Dispatched
 
-**Dispatcher** — a trigger that computes a new value. The `transform` function receives the current value and returns the next value.
+**Dispatcher** — a trigger that computes a new value. Renders a `<button>` with an `onclick` that calls `hzml.set()`.
 
 **Dispatched** — reactive content that displays the current value. Renders either a visible element (when `tag` is provided) or a hidden input (for form submission).
 
-The `to`/`by` channel connects them. The framework auto-generates the client-side update logic — no `<server>` block needed.
+The `to`/`by` channel connects them. Dispatcher's `transform` function runs client-side on click — no server round-trip.
 
 ```html
 <${Dispatcher} to="qty" transform=${v => v - 1}>-<//>
@@ -256,17 +256,36 @@ The `to`/`by` channel connects them. The framework auto-generates the client-sid
 ```
 
 - `to` — the channel name. Connects this Dispatcher to Dispatched elements with the same `by`.
-- `transform` — a function `(currentValue) => nextValue`. The compiler serializes it and emits it as client-side code. Constraints live here — `transform=${v => Math.max(1, Math.min(10, +v + 1))}` enforces bounds.
-- `by` — the channel to subscribe to.
-- `tag` — renders as that element. Omit for a hidden input.
-- `value` — initial display value. The first Dispatched's value is the initial state for the channel.
-- `name` — form field name (hidden input mode).
+- `transform` — a function `(currentValue) => nextValue`. Runs client-side on click. Constraints live here — `transform=${v => Math.max(1, Math.min(10, +v + 1))}` enforces bounds.
+- `value` — for direct value setting (instead of transform). Useful for selection UIs like buttons that set a specific value.
+- `then` — additional JavaScript to run after dispatching (e.g., `then="recalc()"`).
+- `by` — the channel to subscribe to (Dispatched).
+- `tag` — renders as that element. Omit for a hidden input (Dispatched).
+- `value` — initial display value (Dispatched).
+- `name` — form field name, hidden input mode (Dispatched).
 
-Multiple Dispatchers and Dispatched elements on the same channel stay in sync. One click updates every Dispatched element and recomputes every Dispatcher's next href.
+Multiple Dispatchers and Dispatched elements on the same channel stay in sync. One click updates every Dispatched element on that channel.
 
-Values pass through as strings — transforms own their own typing. Use `v - 1` for subtraction (JS implicit coercion) or `+v + 1` for addition (explicit parse). String values work too: `transform=${() => "red"}`.
+Values pass through as strings — transforms own their own typing. Use `v - 1` for subtraction (JS implicit coercion) or `+v + 1` for addition (explicit parse).
 
-For cases that need full control beyond what `transform` provides, `hzml.on(name, callback)` in a `<server>` block registers a raw client-side handler as an escape hatch.
+### Client-side API
+
+The framework exposes two functions for use in `<script>` blocks:
+
+- **`hzml.get(name)`** — read the current value of a channel
+- **`hzml.set(name, valueOrFn)`** — set a channel to a value, or pass a function to transform the current value
+
+These are the same primitives Dispatcher uses internally. For cross-channel logic (e.g., a tip calculator where changing the bill recalculates the tip), use a `<script>` block:
+
+```html
+<script>
+function recalc() {
+  var bill = +hzml.get('bill');
+  var pct = +hzml.get('pct');
+  hzml.set('tip', '$' + (bill * pct / 100).toFixed(2));
+}
+</script>
+```
 
 ## Styling
 
