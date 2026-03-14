@@ -418,6 +418,6 @@ See [`tree-sitter-hzml/README.md`](tree-sitter-hzml/README.md) for setup instruc
 
 ## Dependencies
 
-- [HTMZ](https://github.com/Kalabasa/htmz) — the iframe navigation pattern that started it all
+- [HTMZ](https://github.com/Kalabasa/htmz) — the world's greatest reactive framework
 - [HTM](https://github.com/developit/htm) — tagged template literals
 - [tailwindcss](https://tailwindcss.com) — 🩵
