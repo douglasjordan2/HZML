@@ -1,4 +1,4 @@
-export function htmz(body: string, head = "", scripts = ""): string {
+export function htmz(body: string, head = "", scripts = "", devClient = ""): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -49,6 +49,7 @@ export function htmz(body: string, head = "", scripts = ""): string {
     }
   </script>
   ${scripts}
+  ${devClient}
   <iframe hidden name="htmz" onload="window.htmz(this)"></iframe>
 </body>
 </html>`;

@@ -8,6 +8,7 @@
       <${Link} href="/toggle-demo" class="text-gray-600 font-medium no-underline hover:text-black">Toggles<//>
       <${Link} href="/counter-demo" class="text-gray-600 font-medium no-underline hover:text-black">Counter<//>
       <${Link} href="/tip-calculator" class="text-gray-600 font-medium no-underline hover:text-black">Tip Calc<//>
+      <${Link} href="/loader-demo" class="text-gray-600 font-medium no-underline hover:text-black">Loader<//>
     </nav>
 
     <div id="content">

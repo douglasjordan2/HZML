@@ -1,0 +1,10 @@
+<loader>
+  const timeCheck = new Date().getHours();
+  const timeLocale = timeCheck < 12 ? "morning" : timeCheck < 17 ? "afternoon" : "evening";
+
+  return { timeLocale };
+</loader>
+
+<template>
+  <p class="${cls || ''}">Good ${timeLocale} ${who || "friend"}!</p>
+</template>

@@ -1,7 +1,8 @@
-import { resolve } from "path";
-import { loadComponents } from "./router";
+import { resolve, basename } from "path";
+import { loadComponents, clearComponentCache, clearRouteContext, reloadComponent } from "./router";
 import { createHandler } from "./handler";
 import { createSQLiteAdapter, type DatabaseAdapter } from "./db";
+import { createSSEManager, startWatcher, SSE_CLIENT_SCRIPT } from "./dev";
 
 interface HzmlOptions {
   port?: number;
@@ -25,7 +26,28 @@ export default async function hzml(options: HzmlOptions) {
 
   await loadComponents(projectDir);
 
-  const handler = createHandler(routesDir, publicDir, db);
+  const componentsDir = resolve(projectDir, "components");
+  const sseManager = createSSEManager();
+
+  startWatcher([routesDir, componentsDir], async (filePath, kind) => {
+    const name = basename(filePath, ".hzml");
+    if (filePath.startsWith(componentsDir)) {
+      if (kind === "delete") {
+        clearComponentCache(name);
+      } else {
+        try {
+          await reloadComponent(name, filePath);
+        } catch (err) {
+          console.error(`\x1b[31m[hzml] Failed to reload component ${name}:\x1b[0m`, err);
+        }
+      }
+    } else {
+      clearRouteContext(filePath);
+    }
+    sseManager.broadcast("reload");
+  });
+
+  const handler = createHandler(routesDir, publicDir, db, sseManager, SSE_CLIENT_SCRIPT);
 
   if (globalThis.Bun) {
     Bun.serve({ port, fetch: handler });

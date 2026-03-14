@@ -1,1 +1,1 @@
-["<server>" "</server>" "<template>" "</template>"] @keyword
+["<server>" "</server>" "<loader>" "</loader>" "<template>" "</template>"] @keyword

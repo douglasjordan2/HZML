@@ -3,6 +3,7 @@
 
 enum TokenType {
   SERVER_CONTENT,
+  LOADER_CONTENT,
   TEMPLATE_CONTENT,
 };
 
@@ -59,6 +60,11 @@ bool tree_sitter_hzml_external_scanner_scan(
   if (valid_symbols[SERVER_CONTENT]) {
     lexer->result_symbol = SERVER_CONTENT;
     return scan_raw_text(lexer, "server");
+  }
+
+  if (valid_symbols[LOADER_CONTENT]) {
+    lexer->result_symbol = LOADER_CONTENT;
+    return scan_raw_text(lexer, "loader");
   }
 
   if (valid_symbols[TEMPLATE_CONTENT]) {

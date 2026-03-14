@@ -1,0 +1,26 @@
+<template>
+  <div>
+    <h1 class="text-3xl font-bold mb-6">Loader Demo</h1>
+
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-3">Object return — merges computed data</h2>
+      <${Greeting} who="Douglas" class="text-lg" />
+    </section>
+
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-3">String return — replaces template</h2>
+      <p class="text-gray-500 mb-2">Badge with no children returns raw HTML:</p>
+      <${Badge} />
+    </section>
+
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-3">Object return — variant styling</h2>
+      <div class="flex gap-2">
+        <${Badge} variant="info">Info<//>
+        <${Badge} variant="success">Success<//>
+        <${Badge} variant="warning">Warning<//>
+        <${Badge} variant="error">Error<//>
+      </div>
+    </section>
+  </div>
+</template>

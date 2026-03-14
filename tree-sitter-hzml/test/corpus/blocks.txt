@@ -84,6 +84,26 @@ Template with components
     (template_content)))
 
 ================
+Loader and template component
+================
+
+<loader>
+  if (!children) return { children: "default content" }
+</loader>
+
+<template>
+  <div>${children}</div>
+</template>
+
+---
+
+(source_file
+  (loader_block
+    (loader_content))
+  (template_block
+    (template_content)))
+
+================
 Empty blocks
 ================
 

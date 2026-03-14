@@ -20,6 +20,8 @@
 - SQLite as default database (bun:sqlite, zero dependencies)
 - DatabaseAdapter interface for custom providers (async-capable)
 - Tree-sitter grammar for .hzml syntax highlighting (Neovim — block boundaries + TypeScript/HTML injection)
+- Component `<loader>` blocks for server-side prop logic (derive template vars, early returns)
+- Hot reload dev server (SSE file watcher on routes/ + components/, error overlay, component + route cache invalidation)
 
 ## Client Reactivity
 - Toggle system: Toggled + Toggler components, hidden checkbox/radio state, CSS :has() reactivity ✓
@@ -36,15 +38,9 @@
 - Research: what patterns genuinely need JS vs. what CSS :has() can handle
 
 ## Component Authoring
-Currently, components that need structural branching (render different DOM trees based on props) must be programmatic — defined in router.ts as TypeScript functions. This works for framework built-ins (Toggler, Toggled, Dispatcher, Dispatched) but isn't available to authors.
-
-Template-only components (just a `<template>` block) cover the majority of use cases — a single element with props and children. But when a component needs conditionals, loops over props, or different wrapper elements, the template expression becomes unreadable.
-
-Options to explore:
-- Support `<server>` blocks in component .hzml files with a render function
-- Simple components stay as they are: just a `<template>` block
-- Complex components add a `<server>` block for full JS control
-- Both live in .hzml files — no second file format
+- Component `<loader>` blocks: synchronous server-side logic for deriving template variables from props ✓
+- Loader block scoping: `const` declarations in loaders shadow function params (block-scoped) ✓
+- Loaders can return objects (merged into template data) or raw strings (early return / validation) ✓
 
 ## Next
 - SSE / streaming: deferred data with resolveData seam (Remix-style defer pattern)
@@ -64,10 +60,7 @@ Options to explore:
 ## Future
 - Scoped component loading (opt-in per-route imports if global injection becomes a scaling problem)
 - URL param support on request object (query strings)
-- Error boundaries (what renders when a script throws?)
 - 404/500 route files
-- Hot reload in dev mode
-- Component hot reload: file watcher on component directories (built-in + user) that invalidates componentCache and re-runs loadFromDir on change
 - Production build (single binary via bun build --compile or deno compile)
 - Middleware (auth, logging, etc.)
 - Complex form validation with Zod and other providers

@@ -20,22 +20,33 @@ interface HzmlRequest {
 interface ParsedRoute {
   script: string;
   clientScript: string;
+  loader: string;
   template: string;
 }
 
 export function parseRoute(source: string): ParsedRoute {
   const scriptMatch = source.match(/<server>([\s\S]*?)<\/server>/);
   const clientScriptMatch = source.match(/<script>([\s\S]*?)<\/script>/);
+  const loaderMatch = source.match(/<loader>([\s\S]*?)<\/loader>/);
   const templateMatch = source.match(/<template>([\s\S]*?)<\/template>/);
 
   return {
     script: scriptMatch ? scriptMatch[1].trim() : "",
     clientScript: clientScriptMatch ? clientScriptMatch[1].trim() : "",
+    loader: loaderMatch ? loaderMatch[1].trim() : "",
     template: templateMatch ? templateMatch[1].trim() : "",
   };
 }
 
 const componentCache: Record<string, ComponentFn> = {};
+
+export function clearComponentCache(name?: string) {
+  if (name) {
+    delete componentCache[name];
+  } else {
+    for (const k of Object.keys(componentCache)) delete componentCache[k];
+  }
+}
 
 const JS_GLOBALS = new Set([
   'Boolean', 'Number', 'String', 'Array', 'Object', 'Math', 'Date', 'JSON',
@@ -92,6 +103,7 @@ async function loadFromDir(dir: string) {
     const templateVars = extractTemplateVars(parsed.template);
 
     const tmpl = parsed.template;
+    const loaderCode = parsed.loader;
 
     componentCache[name] = (props: Record<string, unknown>, ctx?: RenderContext) => {
       const data: Record<string, unknown> = {};
@@ -114,6 +126,15 @@ async function loadFromDir(dir: string) {
           .flat(Infinity)
           .filter((c: unknown) => c != null && typeof c !== "boolean")
           .join("");
+      }
+
+      if (loaderCode) {
+        const keys = Object.keys(data).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
+        const values = keys.map(k => data[k]);
+        const loaderFn = new Function(...keys, `{\n${loaderCode}\n}`);
+        const result = loaderFn(...values);
+        if (typeof result === "string") return result;
+        if (typeof result === "object" && result !== null) Object.assign(data, result);
       }
 
       return renderTemplate(tmpl, data, ctx);
@@ -237,6 +258,63 @@ interface RouteContext {
 }
 
 const routeContexts: Record<string, RouteContext> = {};
+
+export function clearRouteContext(filePath?: string) {
+  if (filePath) {
+    delete routeContexts[filePath];
+  } else {
+    for (const k of Object.keys(routeContexts)) delete routeContexts[k];
+  }
+}
+
+export async function reloadComponent(name: string, filePath: string) {
+  const { readFile } = await import("fs/promises");
+  const source = await readFile(filePath, "utf-8");
+  const parsed = parseRoute(source);
+
+  if (!parsed.template) {
+    delete componentCache[name];
+    return;
+  }
+
+  const templateVars = extractTemplateVars(parsed.template);
+  const tmpl = parsed.template;
+  const loaderCode = parsed.loader;
+
+  componentCache[name] = (props: Record<string, unknown>, ctx?: RenderContext) => {
+    const data: Record<string, unknown> = {};
+
+    for (const v of templateVars) {
+      data[v] = undefined;
+    }
+
+    data.cls = undefined;
+    Object.assign(data, props);
+
+    if ("class" in data) {
+      data.cls = data.class;
+      delete data.class;
+    }
+
+    if (Array.isArray(data.children)) {
+      data.children = (data.children as unknown[])
+        .flat(Infinity)
+        .filter((c: unknown) => c != null && typeof c !== "boolean")
+        .join("");
+    }
+
+    if (loaderCode) {
+      const keys = Object.keys(data).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
+      const values = keys.map(k => data[k]);
+      const loaderFn = new Function(...keys, loaderCode);
+      const result = loaderFn(...values);
+      if (typeof result === "string") return result;
+      if (typeof result === "object" && result !== null) Object.assign(data, result);
+    }
+
+    return renderTemplate(tmpl, data, ctx);
+  };
+}
 
 function getRouteContext(script: string, filePath: string, db?: DatabaseAdapter): RouteContext {
   if (routeContexts[filePath]) return routeContexts[filePath];

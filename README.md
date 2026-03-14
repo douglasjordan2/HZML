@@ -175,6 +175,51 @@ On full page loads, the server merges fill content into matching slots and strip
 
 You can create your own components by adding `.hzml` files to a `components/` directory in your project root. They follow the same `<template>` format as routes.
 
+### Component loaders
+
+Components can include a `<loader>` block for server-side logic. The loader runs before the template renders, receives the component's props as local variables, and can return new variables or override existing ones.
+
+```html
+<!-- components/Greeting.hzml -->
+<loader>
+  const name = typeof who === "string" ? who : "world";
+  const time = new Date().getHours();
+  const period = time < 12 ? "morning" : time < 17 ? "afternoon" : "evening";
+  return { greeting: "Good " + period + ", " + name + "!" };
+</loader>
+
+<template>
+  <p class="${cls || ''}">${greeting}</p>
+</template>
+```
+
+```html
+<${Greeting} who="Douglas" class="text-lg" />
+<!-- renders as: <p class="text-lg">Good afternoon, Douglas!</p> -->
+```
+
+Loaders can also return a raw string to replace the entire component output, which is useful for validation or early returns:
+
+```html
+<!-- components/Badge.hzml -->
+<loader>
+  if (!children) return "<span>empty badge</span>";
+  const colors = {
+    info: "bg-blue-100 text-blue-800",
+    success: "bg-green-100 text-green-800",
+    warning: "bg-yellow-100 text-yellow-800",
+    error: "bg-red-100 text-red-800",
+  };
+  return { badgeClass: colors[variant] || colors.info };
+</loader>
+
+<template>
+  <span class="inline-block px-2 py-1 text-xs font-medium rounded-full ${badgeClass}">${children}</span>
+</template>
+```
+
+Loaders run on every render — they're synchronous and have no access to `hzml.db` or request context. They're for deriving template variables from props, not for data fetching.
+
 ## Templating
 
 Templates use [HTM](https://github.com/developit/htm) — JSX-like syntax in tagged template literals. No transpiler, no build step for templates. Everything runs server-side as string concatenation.
@@ -280,8 +325,8 @@ These are the same primitives Dispatcher uses internally. For cross-channel logi
 ```html
 <script>
 function recalc() {
-  var bill = +hzml.get('bill');
-  var pct = +hzml.get('pct');
+  const bill = +hzml.get('bill');
+  const pct = +hzml.get('pct');
   hzml.set('tip', '$' + (bill * pct / 100).toFixed(2));
 }
 </script>
@@ -344,6 +389,16 @@ Async adapters work — route handlers can be async too:
 </server>
 ```
 
+## Dev Server
+
+HZML includes a built-in dev server with hot reload. When the server starts, it watches `routes/` and `components/` for changes to `.hzml` files and automatically reloads connected browsers via Server-Sent Events.
+
+- **Route changes** clear the cached route context so the next request re-evaluates the `<server>` block
+- **Component changes** rebuild the component's render closure in-place
+- **Errors** render an inline overlay in the browser with the message and stack trace, and log to the terminal in red
+
+No configuration needed — hot reload is always on during development.
+
 ## Runtime
 
 HZML uses web-standard `Request`/`Response` APIs. The entry point is runtime-agnostic:
@@ -357,7 +412,7 @@ Works with Bun, Deno, and Node.js.
 
 ## Editor support
 
-HZML includes a [Tree-sitter](https://tree-sitter.github.io/) grammar for syntax highlighting in Neovim. It parses `.hzml` files and uses language injection to delegate TypeScript highlighting to `<server>` blocks and HTML highlighting to `<template>` blocks.
+HZML includes a [Tree-sitter](https://tree-sitter.github.io/) grammar for syntax highlighting in Neovim. It parses `.hzml` files and uses language injection to delegate TypeScript highlighting to `<server>` and `<loader>` blocks and HTML highlighting to `<template>` blocks.
 
 See [`tree-sitter-hzml/README.md`](tree-sitter-hzml/README.md) for setup instructions.
 

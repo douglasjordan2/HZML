@@ -5,6 +5,7 @@ import { createToggleRegistry, type RenderContext } from "./state";
 import { htmz } from "./htmz";
 import type { DatabaseAdapter } from "./db";
 import { matchRoute, fileExists, type RouteMatch } from "./match";
+import { renderErrorOverlay } from "./dev";
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -16,7 +17,7 @@ const MIME_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-export function createHandler(routesDir: string, publicDir: string, db?: DatabaseAdapter) {
+export function createHandler(routesDir: string, publicDir: string, db?: DatabaseAdapter, sseManager?: { handler(): Response }, devClientScript?: string) {
 
 const manifestPath = join(routesDir, "..", ".toggle-manifest");
 const manifestClasses = new Set<string>();
@@ -175,12 +176,16 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
   }
   const toggleCSS = generateToggleCSS(body);
   updateToggleManifest(body);
-  return htmlResponse(htmz(body, toggleCSS, scriptTag));
+  return htmlResponse(htmz(body, toggleCSS, scriptTag, devClientScript ?? ""));
 }
 
 return async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const isPartial = req.headers.get("Sec-Fetch-Dest") === "iframe";
+
+  if (url.pathname === "/__hzml/sse" && sseManager) {
+    return sseManager.handler();
+  }
 
   const staticPath = join(publicDir, url.pathname);
   if (extname(staticPath) && await fileExists(staticPath)) {
@@ -196,7 +201,13 @@ return async function handler(req: Request): Promise<Response> {
     return new Response("Not Found", { status: 404 });
   }
 
-  return renderRoute(match, isPartial, req);
+  try {
+    return await renderRoute(match, isPartial, req);
+  } catch (err) {
+    console.error(`\x1b[31m[hzml] Error rendering ${match.filePath}:\x1b[0m`, err);
+    const overlay = renderErrorOverlay(err, match.filePath);
+    return htmlResponse(htmz(overlay, "", "", devClientScript ?? ""));
+  }
 };
 
 }
