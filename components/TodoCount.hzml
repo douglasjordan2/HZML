@@ -2,9 +2,10 @@
   const rows = hzml.db.query("SELECT COUNT(*) as count FROM todos")
   const count = rows[0]?.count || 0
   if (count === 0) return ""
-  return { count }
+  const label = `todo${count !== 1 ? 's' : ''}`
+  return { count, label }
 </loader>
 
 <template>
-  <span class="${cls || ''}">${count} todo${count !== 1 ? 's' : ''}</span>
+  <span class="${cls || ''}">${count}${useLabel && ` ${label}`}</span>
 </template>

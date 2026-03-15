@@ -304,10 +304,6 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
     componentCache[name] = (props: Record<string, unknown>, ctx?: RenderContext) => {
       const data: Record<string, unknown> = {};
 
-      for (const v of templateVars) {
-        data[v] = undefined;
-      }
-
       data.cls = undefined;
       Object.assign(data, props);
 
@@ -331,6 +327,12 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
         const result = loaderFn(hzml, ...values);
         if (typeof result === "string") return result;
         if (typeof result === "object" && result !== null) Object.assign(data, result);
+      }
+
+      for (const v of templateVars) {
+        if (!(v in data)) {
+          data[v] = undefined;
+        }
       }
 
       return renderTemplate(tmpl, data, ctx);
