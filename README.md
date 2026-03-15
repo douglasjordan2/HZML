@@ -225,6 +225,7 @@ Loaders have access to `hzml.db` for database queries, making components fully s
 <loader>
   const rows = hzml.db.query("SELECT COUNT(*) as count FROM todos")
   const count = rows[0]?.count || 0
+  if (count === 0) return ""
   return { count }
 </loader>
 

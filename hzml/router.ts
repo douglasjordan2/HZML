@@ -3,7 +3,7 @@ import { readdir, readFile } from "fs/promises";
 import htm from "htm";
 import { html, h as baseH, type HtmlChild, type PropValue } from "./render";
 import type { RenderContext } from "./state";
-import type { DatabaseAdapter } from "./db";
+import type { FrameworkContext } from "./plugin";
 
 const BUILT_IN_COMPONENTS = join(import.meta.dirname ?? import.meta.dir, "components");
 
@@ -31,21 +31,11 @@ export function parseRoute(source: string): ParsedRoute {
   const templateMatch = source.match(/<template>([\s\S]*?)<\/template>/);
 
   return {
-    script: scriptMatch ? scriptMatch[1].trim() : "",
-    clientScript: clientScriptMatch ? clientScriptMatch[1].trim() : "",
-    loader: loaderMatch ? loaderMatch[1].trim() : "",
-    template: templateMatch ? templateMatch[1].trim() : "",
+    script: scriptMatch?.[1]?.trim() || "",
+    clientScript: clientScriptMatch?.[1]?.trim() || "",
+    loader: loaderMatch?.[1]?.trim() || "",
+    template:  templateMatch?.[1]?.trim() || "",
   };
-}
-
-const componentCache: Record<string, ComponentFn> = {};
-
-export function clearComponentCache(name?: string) {
-  if (name) {
-    delete componentCache[name];
-  } else {
-    for (const k of Object.keys(componentCache)) delete componentCache[k];
-  }
 }
 
 const JS_GLOBALS = new Set([
@@ -55,6 +45,14 @@ const JS_GLOBALS = new Set([
   'encodeURI', 'decodeURI', 'encodeURIComponent', 'decodeURIComponent',
   'console', 'window', 'document', 'globalThis',
   'Map', 'Set', 'Promise', 'Symbol', 'RegExp', 'Error', 'TypeError',
+]);
+
+const RESERVED = new Set([
+  'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
+  'default', 'delete', 'do', 'else', 'export', 'extends', 'finally',
+  'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new',
+  'return', 'static', 'super', 'switch', 'this', 'throw', 'try',
+  'typeof', 'var', 'void', 'while', 'with', 'yield',
 ]);
 
 function extractTemplateVars(template: string): Set<string> {
@@ -83,25 +81,223 @@ function extractTemplateVars(template: string): Set<string> {
   return vars;
 }
 
-async function loadFromDir(dir: string) {
-  let entries;
-  try {
-    entries = await readdir(dir);
-  } catch {
-    return;
+export interface HzmlRouter {
+  db?: import("./db").DatabaseAdapter;
+  executeScript: (script: string, request: Request, params?: Record<string, string>, filePath?: string) => Promise<Record<string, unknown>>;
+  renderTemplate: (template: string, data: Record<string, unknown>, ctx?: RenderContext) => string;
+  loadComponents: (projectDir?: string) => Promise<void>;
+  clearComponentCache: (name?: string) => void;
+  clearRouteContext: (filePath?: string) => void;
+  reloadComponent: (name: string, filePath: string) => Promise<void>;
+}
+
+interface RouteContext {
+  getHandler: RouteHandler | null;
+  postHandler: RouteHandler | null;
+}
+
+export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
+  const componentCache: Record<string, ComponentFn> = {};
+  const routeContexts: Record<string, RouteContext> = {};
+
+  function clearComponentCache(name?: string) {
+    if (name) {
+      delete componentCache[name];
+    } else {
+      for (const k of Object.keys(componentCache)) delete componentCache[k];
+    }
   }
 
-  for (const file of entries) {
-    if (!file.endsWith(".hzml")) continue;
+  function clearRouteContext(filePath?: string) {
+    if (filePath) {
+      delete routeContexts[filePath];
+    } else {
+      for (const k of Object.keys(routeContexts)) delete routeContexts[k];
+    }
+  }
 
-    const name = basename(file, ".hzml");
-    const source = await readFile(join(dir, file), "utf-8");
+  function buildLoaderHzml() {
+    return { db: frameworkCtx.db, ...frameworkCtx.extensions };
+  }
+
+  async function loadFromDir(dir: string) {
+    let entries;
+    try {
+      entries = await readdir(dir);
+    } catch {
+      return;
+    }
+
+    for (const file of entries) {
+      if (!file.endsWith(".hzml")) continue;
+
+      const name = basename(file, ".hzml");
+      const source = await readFile(join(dir, file), "utf-8");
+      const parsed = parseRoute(source);
+
+      if (!parsed.template) continue;
+
+      const templateVars = extractTemplateVars(parsed.template);
+
+      const tmpl = parsed.template;
+      const loaderCode = parsed.loader;
+
+      componentCache[name] = (props: Record<string, unknown>, ctx?: RenderContext) => {
+        const data: Record<string, unknown> = {};
+
+        for (const v of templateVars) {
+          data[v] = undefined;
+        }
+
+        data.cls = undefined;
+
+        Object.assign(data, props);
+
+        if ("class" in data) {
+          data.cls = data.class;
+          delete data.class;
+        }
+
+        if (Array.isArray(data.children)) {
+          data.children = (data.children as unknown[])
+            .flat(Infinity)
+            .filter((c: unknown) => c != null && typeof c !== "boolean")
+            .join("");
+        }
+
+        if (loaderCode) {
+          const keys = Object.keys(data).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
+          const values = keys.map(k => data[k]);
+          const hzml = buildLoaderHzml();
+          const loaderFn = new Function('hzml', ...keys, `{\n${loaderCode}\n}`);
+          const result = loaderFn(hzml, ...values);
+          if (typeof result === "string") return result;
+          if (typeof result === "object" && result !== null) Object.assign(data, result);
+        }
+
+        return renderTemplate(tmpl, data, ctx);
+      };
+    }
+  }
+
+  async function loadComponents(projectDir?: string): Promise<void> {
+    if (Object.keys(componentCache).length > 0) return;
+
+    await loadFromDir(BUILT_IN_COMPONENTS);
+
+    if (projectDir) {
+      await loadFromDir(join(projectDir, "components"));
+    }
+
+    componentCache['Dispatcher'] = (props: Record<string, unknown>) => {
+      const to = props.to as string;
+      const transform = props.transform as Function | undefined;
+      const value = props.value as string | undefined;
+      const then = props.then as string | undefined;
+      const tag = (props.tag as string) || 'button';
+      const children = Array.isArray(props.children)
+        ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
+        : (props.children || '');
+      const reserved = new Set(['to', 'value', 'transform', 'then', 'tag', 'children']);
+      const attrs = Object.entries(props)
+        .filter(([k]) => !reserved.has(k))
+        .map(([k, v]) => k === 'class' ? ` class="${v}"` : ` ${k}="${v}"`)
+        .join('');
+
+      let onclick = '';
+      if (transform) {
+        onclick = `hzml.set('${to}',${transform.toString()})`;
+      } else if (value !== undefined) {
+        const escaped = String(value).replace(/'/g, "\\'");
+        onclick = `hzml.set('${to}','${escaped}')`;
+      }
+      if (then) onclick += ';' + then;
+
+      const onclickAttr = onclick ? ` onclick="${onclick}"` : '';
+      const typeAttr = tag === 'button' ? ' type="button"' : '';
+      return `<${tag}${typeAttr}${onclickAttr}${attrs}>${children}</${tag}>`;
+    };
+
+    componentCache['Dispatched'] = (props: Record<string, unknown>) => {
+      const by = props.by as string;
+      const tag = props.tag as string | undefined;
+      const value = props.value as string || '';
+      const name = props.name as string | undefined;
+      const cls = (props.class as string) || '';
+      const children = Array.isArray(props.children)
+        ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
+        : (props.children || '');
+
+      if (tag) {
+        return `<${tag} data-d="${by}"${cls ? ` class="${cls}"` : ''}>${children || value}</${tag}>`;
+      }
+      return `<input data-d="${by}" value="${value}" name="${name || by}" type="hidden">`;
+    };
+
+    componentCache['Toggler'] = (props: Record<string, unknown>) => {
+      const id = props.id as string;
+      const on = props.on;
+      const off = props.off;
+      const tag = props.tag as string | undefined;
+      const ontrue = (props.ontrue as string) || '';
+      const onfalse = (props.onfalse as string) || '';
+      const cls = (props.class as string) || '';
+      const children = Array.isArray(props.children)
+        ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
+        : (props.children || '');
+
+      const dirAttr = on !== undefined ? ' data-toggle-dir="on"'
+        : off !== undefined ? ' data-toggle-dir="off"'
+        : '';
+
+      if (tag) {
+        const classes = [
+          ...ontrue.split(' ').filter(Boolean).map(c => `group-has-[#${id}:checked]/root:${c}`),
+          ...onfalse.split(' ').filter(Boolean),
+          ...cls.split(' ').filter(Boolean),
+        ].join(' ');
+        return `<${tag} class="${classes}"><label for="${id}"${dirAttr} class="contents cursor-pointer">${children}</label></${tag}>`;
+      }
+
+      return `<label for="${id}"${dirAttr}${cls ? ` class="${cls}"` : ''}>${children}</label>`;
+    };
+
+    componentCache['Toggled'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
+      const id = props.id as string;
+      const name = props.name as string | undefined;
+      const checked = !!props.checked;
+      const ontrue = (props.ontrue as string) || '';
+      const onfalse = (props.onfalse as string) || '';
+      const cls = ((props.class as string) || '');
+      const tag = (props.tag as string) || 'div';
+      const children = Array.isArray(props.children)
+        ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
+        : (props.children || '');
+
+      if (ctx) {
+        ctx.toggleRegistry.register(id, name, checked);
+      }
+
+      const classes = [
+        ...ontrue.split(' ').filter(Boolean).map(c => `group-has-[#${id}:checked]/root:${c}`),
+        ...onfalse.split(' ').filter(Boolean),
+        ...cls.split(' ').filter(Boolean),
+      ].join(' ');
+
+      return `<${tag} class="${classes}">${children}</${tag}>`;
+    };
+  }
+
+  async function reloadComponent(name: string, filePath: string) {
+    const source = await readFile(filePath, "utf-8");
     const parsed = parseRoute(source);
 
-    if (!parsed.template) continue;
+    if (!parsed.template) {
+      delete componentCache[name];
+      return;
+    }
 
     const templateVars = extractTemplateVars(parsed.template);
-
     const tmpl = parsed.template;
     const loaderCode = parsed.loader;
 
@@ -113,7 +309,6 @@ async function loadFromDir(dir: string) {
       }
 
       data.cls = undefined;
-
       Object.assign(data, props);
 
       if ("class" in data) {
@@ -131,8 +326,8 @@ async function loadFromDir(dir: string) {
       if (loaderCode) {
         const keys = Object.keys(data).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
         const values = keys.map(k => data[k]);
-        const hzml = { db: ctx?.db };
-        const loaderFn = new Function('hzml', ...keys, `{\n${loaderCode}\n}`);
+        const hzml = buildLoaderHzml();
+        const loaderFn = new Function('hzml', ...keys, loaderCode);
         const result = loaderFn(hzml, ...values);
         if (typeof result === "string") return result;
         if (typeof result === "object" && result !== null) Object.assign(data, result);
@@ -142,264 +337,94 @@ async function loadFromDir(dir: string) {
     };
   }
 
-}
+  function getRouteContext(script: string, filePath: string): RouteContext {
+    if (routeContexts[filePath]) return routeContexts[filePath];
 
-export async function loadComponents(projectDir?: string): Promise<void> {
-  if (Object.keys(componentCache).length > 0) return;
+    let getHandler: RouteHandler | null = null;
+    let postHandler: RouteHandler | null = null;
 
-  await loadFromDir(BUILT_IN_COMPONENTS);
+    const get = (fn: RouteHandler) => { getHandler = fn; };
+    const post = (fn: RouteHandler) => { postHandler = fn; };
+    const redirect = (url: string) => ({ __redirect: url });
 
-  if (projectDir) {
-    await loadFromDir(join(projectDir, "components"));
+    const clean = script.replace(/^import\s.*$/gm, "");
+
+    const hzml = { get, post, redirect, db: frameworkCtx.db, ...frameworkCtx.extensions };
+
+    const injectionKeys = Object.keys(frameworkCtx.injections).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
+    const injectionValues = injectionKeys.map(k => frameworkCtx.injections[k]);
+
+    const register = new Function("hzml", ...injectionKeys, clean);
+    register(hzml, ...injectionValues);
+
+    const ctx = { getHandler, postHandler };
+    routeContexts[filePath] = ctx;
+    return ctx;
   }
 
-  componentCache['Dispatcher'] = (props: Record<string, unknown>) => {
-    const to = props.to as string;
-    const transform = props.transform as Function | undefined;
-    const value = props.value as string | undefined;
-    const then = props.then as string | undefined;
-    const tag = (props.tag as string) || 'button';
-    const children = Array.isArray(props.children)
-      ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
-      : (props.children || '');
-    const reserved = new Set(['to', 'value', 'transform', 'then', 'tag', 'children']);
-    const attrs = Object.entries(props)
-      .filter(([k]) => !reserved.has(k))
-      .map(([k, v]) => k === 'class' ? ` class="${v}"` : ` ${k}="${v}"`)
-      .join('');
+  async function executeScript(
+    script: string,
+    request: Request,
+    params: Record<string, string> = {},
+    filePath: string = "",
+  ): Promise<Record<string, unknown>> {
+    const { getHandler, postHandler } = getRouteContext(script, filePath);
 
-    let onclick = '';
-    if (transform) {
-      onclick = `hzml.set('${to}',${transform.toString()})`;
-    } else if (value !== undefined) {
-      const escaped = String(value).replace(/'/g, "\\'");
-      onclick = `hzml.set('${to}','${escaped}')`;
-    }
-    if (then) onclick += ';' + then;
+    const method = request.method.toLowerCase();
 
-    const onclickAttr = onclick ? ` onclick="${onclick}"` : '';
-    const typeAttr = tag === 'button' ? ' type="button"' : '';
-    return `<${tag}${typeAttr}${onclickAttr}${attrs}>${children}</${tag}>`;
-  };
+    const req: HzmlRequest = { method, headers: request.headers, params };
 
-  componentCache['Dispatched'] = (props: Record<string, unknown>) => {
-    const by = props.by as string;
-    const tag = props.tag as string | undefined;
-    const value = props.value as string || '';
-    const name = props.name as string | undefined;
-    const cls = (props.class as string) || '';
-    const children = Array.isArray(props.children)
-      ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
-      : (props.children || '');
-
-    if (tag) {
-      return `<${tag} data-d="${by}"${cls ? ` class="${cls}"` : ''}>${children || value}</${tag}>`;
-    }
-    return `<input data-d="${by}" value="${value}" name="${name || by}" type="hidden">`;
-  };
-
-  componentCache['Toggler'] = (props: Record<string, unknown>) => {
-    const id = props.id as string;
-    const on = props.on;
-    const off = props.off;
-    const tag = props.tag as string | undefined;
-    const ontrue = (props.ontrue as string) || '';
-    const onfalse = (props.onfalse as string) || '';
-    const cls = (props.class as string) || '';
-    const children = Array.isArray(props.children)
-      ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
-      : (props.children || '');
-
-    const dirAttr = on !== undefined ? ' data-toggle-dir="on"'
-      : off !== undefined ? ' data-toggle-dir="off"'
-      : '';
-
-    if (tag) {
-      const classes = [
-        ...ontrue.split(' ').filter(Boolean).map(c => `group-has-[#${id}:checked]/root:${c}`),
-        ...onfalse.split(' ').filter(Boolean),
-        ...cls.split(' ').filter(Boolean),
-      ].join(' ');
-      return `<${tag} class="${classes}"><label for="${id}"${dirAttr} class="contents cursor-pointer">${children}</label></${tag}>`;
+    if (method === "post" && postHandler) {
+      const formData = await request.formData();
+      req.body = Object.fromEntries(formData);
+      return await postHandler(req);
     }
 
-    return `<label for="${id}"${dirAttr}${cls ? ` class="${cls}"` : ''}>${children}</label>`;
-  };
+    if (method === "get" && getHandler) return await getHandler(req);
 
-  componentCache['Toggled'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
-    const id = props.id as string;
-    const name = props.name as string | undefined;
-    const checked = !!props.checked;
-    const ontrue = (props.ontrue as string) || '';
-    const onfalse = (props.onfalse as string) || '';
-    const cls = ((props.class as string) || '');
-    const tag = (props.tag as string) || 'div';
-    const children = Array.isArray(props.children)
-      ? (props.children as unknown[]).flat(Infinity).filter(c => c != null && typeof c !== 'boolean').join('')
-      : (props.children || '');
+    return {};
+  }
+
+  function renderTemplate(
+    template: string,
+    data: Record<string, unknown>,
+    ctx?: RenderContext,
+  ): string {
+    if (!template) return "";
+
+    const allData = { ...componentCache, ...frameworkCtx.injections, ...data };
+    const keys = Object.keys(allData).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
+    const values = keys.map(k => allData[k]);
+
+    let htmlFn: (strings: TemplateStringsArray, ...vals: unknown[]) => string;
 
     if (ctx) {
-      ctx.toggleRegistry.register(id, name, checked);
+      const ctxH = (type: string | ComponentFn, props: Record<string, PropValue> | null, ...children: HtmlChild[]): string => {
+        if (typeof type === "function") {
+          return type({ ...props, children: children.flat() }, ctx);
+        }
+        return baseH(type, props, ...children);
+      };
+      const _ctxHtml = htm.bind(ctxH);
+      htmlFn = (strings: TemplateStringsArray, ...vals: unknown[]): string => {
+        const result = _ctxHtml(strings, ...vals);
+        return Array.isArray(result) ? (result as string[]).join("") : result as string;
+      };
+    } else {
+      htmlFn = html;
     }
 
-    const classes = [
-      ...ontrue.split(' ').filter(Boolean).map(c => `group-has-[#${id}:checked]/root:${c}`),
-      ...onfalse.split(' ').filter(Boolean),
-      ...cls.split(' ').filter(Boolean),
-    ].join(' ');
+    const fn = new Function("html", ...keys, "return html`" + template + "`");
+    return fn(htmlFn, ...values);
+  }
 
-    return `<${tag} class="${classes}">${children}</${tag}>`;
+  return {
+    db: frameworkCtx.db,
+    executeScript,
+    renderTemplate,
+    loadComponents,
+    clearComponentCache,
+    clearRouteContext,
+    reloadComponent,
   };
-
-}
-
-interface RouteContext {
-  getHandler: RouteHandler | null;
-  postHandler: RouteHandler | null;
-}
-
-const routeContexts: Record<string, RouteContext> = {};
-
-export function clearRouteContext(filePath?: string) {
-  if (filePath) {
-    delete routeContexts[filePath];
-  } else {
-    for (const k of Object.keys(routeContexts)) delete routeContexts[k];
-  }
-}
-
-export async function reloadComponent(name: string, filePath: string) {
-  const { readFile } = await import("fs/promises");
-  const source = await readFile(filePath, "utf-8");
-  const parsed = parseRoute(source);
-
-  if (!parsed.template) {
-    delete componentCache[name];
-    return;
-  }
-
-  const templateVars = extractTemplateVars(parsed.template);
-  const tmpl = parsed.template;
-  const loaderCode = parsed.loader;
-
-  componentCache[name] = (props: Record<string, unknown>, ctx?: RenderContext) => {
-    const data: Record<string, unknown> = {};
-
-    for (const v of templateVars) {
-      data[v] = undefined;
-    }
-
-    data.cls = undefined;
-    Object.assign(data, props);
-
-    if ("class" in data) {
-      data.cls = data.class;
-      delete data.class;
-    }
-
-    if (Array.isArray(data.children)) {
-      data.children = (data.children as unknown[])
-        .flat(Infinity)
-        .filter((c: unknown) => c != null && typeof c !== "boolean")
-        .join("");
-    }
-
-    if (loaderCode) {
-      const keys = Object.keys(data).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
-      const values = keys.map(k => data[k]);
-      const hzml = { db: ctx?.db };
-      const loaderFn = new Function('hzml', ...keys, loaderCode);
-      const result = loaderFn(hzml, ...values);
-      if (typeof result === "string") return result;
-      if (typeof result === "object" && result !== null) Object.assign(data, result);
-    }
-
-    return renderTemplate(tmpl, data, ctx);
-  };
-}
-
-function getRouteContext(script: string, filePath: string, db?: DatabaseAdapter): RouteContext {
-  if (routeContexts[filePath]) return routeContexts[filePath];
-
-  let getHandler: RouteHandler | null = null;
-  let postHandler: RouteHandler | null = null;
-
-  const get = (fn: RouteHandler) => { getHandler = fn; };
-  const post = (fn: RouteHandler) => { postHandler = fn; };
-  const redirect = (url: string) => ({ __redirect: url });
-
-  const clean = script.replace(/^import\s.*$/gm, "");
-
-  const hzml = { get, post, redirect, db };
-  const register = new Function("hzml", clean);
-  register(hzml);
-
-  const ctx = { getHandler, postHandler };
-  routeContexts[filePath] = ctx;
-  return ctx;
-}
-
-export async function executeScript(
-  script: string,
-  request: Request,
-  params: Record<string, string> = {},
-  filePath: string = "",
-  db?: DatabaseAdapter,
-): Promise<Record<string, unknown>> {
-  const { getHandler, postHandler } = getRouteContext(script, filePath, db);
-
-  const method = request.method.toLowerCase();
-
-  const req: HzmlRequest = { method, headers: request.headers, params };
-
-  if (method === "post" && postHandler) {
-    const formData = await request.formData();
-    req.body = Object.fromEntries(formData);
-    return await postHandler(req);
-  }
-
-  if (method === "get" && getHandler) return await getHandler(req);
-
-  return {};
-}
-
-const RESERVED = new Set([
-  'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
-  'default', 'delete', 'do', 'else', 'export', 'extends', 'finally',
-  'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new',
-  'return', 'static', 'super', 'switch', 'this', 'throw', 'try',
-  'typeof', 'var', 'void', 'while', 'with', 'yield',
-]);
-
-export function renderTemplate(
-  template: string,
-  data: Record<string, unknown>,
-  ctx?: RenderContext,
-): string {
-  if (!template) return "";
-
-  const allData = { ...componentCache, ...data };
-  const keys = Object.keys(allData).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
-  const values = keys.map(k => allData[k]);
-
-  let htmlFn: (strings: TemplateStringsArray, ...vals: unknown[]) => string;
-
-  if (ctx) {
-    const ctxH = (type: string | ComponentFn, props: Record<string, PropValue> | null, ...children: HtmlChild[]): string => {
-      if (typeof type === "function") {
-        return type({ ...props, children: children.flat() }, ctx);
-      }
-      return baseH(type, props, ...children);
-    };
-    const _ctxHtml = htm.bind(ctxH);
-    htmlFn = (strings: TemplateStringsArray, ...vals: unknown[]): string => {
-      const result = _ctxHtml(strings, ...vals);
-      return Array.isArray(result) ? (result as string[]).join("") : result as string;
-    };
-  } else {
-    htmlFn = html;
-  }
-
-  const fn = new Function("html", ...keys, "return html`" + template + "`");
-  return fn(htmlFn, ...values);
 }

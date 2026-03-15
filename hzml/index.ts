@@ -1,12 +1,14 @@
 import { resolve, basename } from "path";
-import { loadComponents, clearComponentCache, clearRouteContext, reloadComponent } from "./router";
 import { createHandler } from "./handler";
 import { createSQLiteAdapter, type DatabaseAdapter } from "./db";
 import { createSSEManager, startWatcher, SSE_CLIENT_SCRIPT } from "./dev";
+import { initRouter } from "./router";
+import { resolvePlugins, type HzmlPlugin, type FrameworkContext } from "./plugin";
 
 interface HzmlOptions {
   port?: number;
   db?: { provider?: DatabaseAdapter | "sqlite"; path?: string };
+  plugins?: HzmlPlugin[];
 }
 
 export default async function hzml(options: HzmlOptions) {
@@ -24,7 +26,12 @@ export default async function hzml(options: HzmlOptions) {
   const routesDir = resolve(projectDir, "routes");
   const publicDir = resolve(projectDir, "public");
 
-  await loadComponents(projectDir);
+  const { extensions, injections } = await resolvePlugins(options.plugins ?? [], db, projectDir);
+
+  const frameworkCtx: FrameworkContext = { db, extensions, injections };
+  const router = initRouter(frameworkCtx);
+
+  await router.loadComponents(projectDir);
 
   const componentsDir = resolve(projectDir, "components");
   const sseManager = createSSEManager();
@@ -33,21 +40,21 @@ export default async function hzml(options: HzmlOptions) {
     const name = basename(filePath, ".hzml");
     if (filePath.startsWith(componentsDir)) {
       if (kind === "delete") {
-        clearComponentCache(name);
+        router.clearComponentCache(name);
       } else {
         try {
-          await reloadComponent(name, filePath);
+          await router.reloadComponent(name, filePath);
         } catch (err) {
           console.error(`\x1b[31m[hzml] Failed to reload component ${name}:\x1b[0m`, err);
         }
       }
     } else {
-      clearRouteContext(filePath);
+      router.clearRouteContext(filePath);
     }
     sseManager.broadcast("reload");
   });
 
-  const handler = createHandler(routesDir, publicDir, db, sseManager, SSE_CLIENT_SCRIPT);
+  const handler = createHandler(routesDir, publicDir, router, sseManager, SSE_CLIENT_SCRIPT);
 
   if (globalThis.Bun) {
     Bun.serve({ port, fetch: handler });

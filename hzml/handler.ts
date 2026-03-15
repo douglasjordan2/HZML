@@ -1,9 +1,9 @@
 import { join, extname } from "path";
 import { readFile, writeFile } from "fs/promises";
-import { parseRoute, executeScript, renderTemplate } from "./router";
+import { parseRoute } from "./router";
+import type { HzmlRouter } from "./router";
 import { createToggleRegistry, type RenderContext } from "./state";
 import { htmz } from "./htmz";
-import type { DatabaseAdapter } from "./db";
 import { matchRoute, fileExists, type RouteMatch } from "./match";
 import { renderErrorOverlay } from "./dev";
 
@@ -17,7 +17,7 @@ const MIME_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-export function createHandler(routesDir: string, publicDir: string, db?: DatabaseAdapter, sseManager?: { handler(): Response }, devClientScript?: string) {
+export function createHandler(routesDir: string, publicDir: string, router: HzmlRouter, sseManager?: { handler(): Response }, devClientScript?: string) {
 
 const manifestPath = join(routesDir, "..", ".toggle-manifest");
 const manifestClasses = new Set<string>();
@@ -126,7 +126,6 @@ function htmlResponse(body: string): Response {
 async function renderRoute(match: RouteMatch, isPartial: boolean, request: Request): Promise<Response> {
   const ctx: RenderContext = {
     toggleRegistry: createToggleRegistry(),
-    db,
   };
   const source = await readFile(match.filePath, "utf-8");
   const route = parseRoute(source);
@@ -135,16 +134,16 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
   const clientScript = route.clientScript || '';
 
   if (route.script) {
-    const data = await executeScript(route.script, request, match.params, match.filePath, db);
+    const data = await router.executeScript(route.script, request, match.params, match.filePath);
 
     if (data?.__redirect) {
       return Response.redirect(data.__redirect, 302);
     }
 
     const resolved = await resolveData(data);
-    body = route.template ? renderTemplate(route.template, resolved, ctx) : "";
+    body = route.template ? router.renderTemplate(route.template, resolved, ctx) : "";
   } else {
-    body = route.template ? renderTemplate(route.template, {}, ctx) : source;
+    body = route.template ? router.renderTemplate(route.template, {}, ctx) : source;
   }
 
   const scriptTag = clientScript ? `<script>${clientScript}</script>` : '';
@@ -155,7 +154,7 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
     const source = await readFile(layoutPath, "utf-8");
     const layout = parseRoute(source);
     const tmpl = layout.template || source;
-    body = renderTemplate(tmpl, { children: body }, ctx);
+    body = router.renderTemplate(tmpl, { children: body }, ctx);
   }
 
   if (isPartial) {
@@ -167,7 +166,7 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
     const source = await readFile(rootLayout, "utf-8");
     const layout = parseRoute(source);
     const tmpl = layout.template || source;
-    body = renderTemplate(tmpl, { children: body }, ctx);
+    body = router.renderTemplate(tmpl, { children: body }, ctx);
     body = mergeChannels(body);
   }
 

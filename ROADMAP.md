@@ -43,6 +43,8 @@
 - Loaders can return objects (merged into template data) or raw strings (early return / validation) ✓
 
 ## Next
+- Request-scoped query cache: dedupe identical db queries within a single render pass (Map on RenderContext, dies when request ends — no invalidation needed)
+- HTMZ append mode: data-hzml-append="target-id" on response elements appends children instead of replacing (load more, chat, infinite scroll — opt-in, server still authoritative on refresh)
 - SSE / streaming: deferred data with resolveData seam (Remix-style defer pattern)
 - Head tag architecture (per-route title, meta — full page only, title updates on HTMZ nav)
 - Plugin system for injected modules (hzml.config.js)
