@@ -72,7 +72,7 @@ export default async function hzml(options: HzmlOptions) {
       const request = new Request(url, { method: req.method, headers });
       const response = await handler(request);
       res.writeHead(response.status, Object.fromEntries(response.headers));
-      res.end(Buffer.from(await response.arrayBuffer()));
+      res.end(new Uint8Array(await response.arrayBuffer()));
     }).listen(port);
   }
 
