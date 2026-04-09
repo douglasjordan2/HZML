@@ -23,6 +23,7 @@
 - Tree-sitter grammar for .hzml syntax highlighting (Neovim — block boundaries + TypeScript/HTML injection)
 - Component `<loader>` blocks for server-side prop logic (derive template vars, early returns)
 - Hot reload dev server (SSE file watcher on routes/ + components/, error overlay, component + route cache invalidation)
+- Streaming: hzml.defer() + Suspense on both paths (full-page: ReadableStream chunks, partials: NDJSON side-channel via /__hzml/deferred/:id)
 
 ## Client Reactivity
 - Toggle system: Toggled + Toggler components, hidden checkbox/radio state, CSS :has() reactivity ✓
@@ -46,7 +47,6 @@
 ## Next
 - Request-scoped query cache: dedupe identical db queries within a single render pass (Map on RenderContext, dies when request ends — no invalidation needed)
 - HTMZ append mode: data-hzml-append="target-id" on response elements appends children instead of replacing (load more, chat, infinite scroll — opt-in, server still authoritative on refresh)
-- SSE / streaming: hzml.defer() + Suspense component works on full-page loads (progressive streaming via ReadableStream). HTMZ partial path (iframe navigation) still awaits all deferred data before responding — needs streaming partial support.
 - Head tag architecture (per-route title, meta — full page only, title updates on HTMZ nav)
 - Plugin system for injected modules (hzml.config.js)
 - Import resolution in script blocks (currently stripped)

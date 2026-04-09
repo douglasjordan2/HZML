@@ -424,7 +424,7 @@ HZML includes a built-in dev server with hot reload. When the server starts, it 
 
 No configuration needed — hot reload is always on during development.
 
-## Streaming (in progress)
+## Streaming
 
 HZML supports streaming HTML responses using `hzml.defer()` and the `<Suspense>` component. Slow data sources can resolve after the initial page shell is sent, replacing a fallback with the real content when it arrives — similar to Remix's `defer` pattern.
 
@@ -446,9 +446,12 @@ HZML supports streaming HTML responses using `hzml.defer()` and the `<Suspense>`
 </template>
 ```
 
-`hzml.defer()` wraps a Promise. The template renders immediately with the fallback, and the server holds the connection open. When the promise resolves, a `<template>` + `<script>` chunk is flushed that swaps the fallback for the real content. Deferred promises time out after 30 seconds.
+`hzml.defer()` wraps a Promise. The template renders immediately with the fallback. When the promise resolves, the fallback is swapped for the real content. Deferred promises time out after 30 seconds.
 
-**Current UX issues:** Streaming works on direct navigation (typing a URL or refreshing the page) — you see the page shell with fallbacks, then deferred content swaps in as it resolves. However, when navigating via HTMZ (clicking a link from another page), the iframe partial path awaits all deferred data before sending the response. This means in-app navigation to a page with slow deferrals blocks until everything resolves — no fallbacks, no progressive rendering. The two paths behave differently for the same route.
+Streaming works on both navigation paths:
+
+- **Direct navigation** (typing a URL or refreshing) — the server holds the connection open via `ReadableStream` and flushes `<template>` + `<script>` chunks that swap content as each promise resolves.
+- **HTMZ navigation** (clicking a link) — the partial response returns immediately with Suspense fallbacks. An inline script fetches resolved data from a one-time NDJSON endpoint (`/__hzml/deferred/:id`) and swaps each placeholder in the main page as it arrives.
 
 ## Runtime
 

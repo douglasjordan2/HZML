@@ -19,7 +19,16 @@ const MIME_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
+interface PendingDeferredEntry {
+  id: number;
+  promise: Promise<unknown>;
+  render: (data: unknown) => string;
+}
+
 export function createHandler(routesDir: string, publicDir: string, router: HzmlRouter, getRouteTable: () => RouteTable, sseManager?: { handler(): Response }, devClientScript?: string) {
+
+let deferredRequestId = 0;
+const pendingDeferreds = new Map<string, PendingDeferredEntry[]>();
 
 const manifestPath = join(routesDir, "..", ".toggle-manifest");
 const manifestClasses = new Set<string>();
@@ -140,11 +149,6 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
       const data = await router.executeScript(route.script, request, match.params, match.filePath);
       if (data?.__redirect) return Response.redirect(data.__redirect, 302);
       const resolved = await resolveData(data);
-      for (const [k, v] of Object.entries(resolved)) {
-        if (isDeferred(v)) {
-          try { resolved[k] = await (v as Deferred).promise; } catch { resolved[k] = undefined; }
-        }
-      }
       body = route.template ? router.renderTemplate(route.template, resolved, ctx) : "";
     } else {
       body = route.template ? router.renderTemplate(route.template, {}, ctx) : source;
@@ -157,7 +161,30 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
       body = router.renderTemplate(layout.template || src, { children: body }, ctx);
     }
     const toggleInputs = ctx.toggleRegistry.emit();
-    return htmlResponse(`<div id="content">${toggleInputs}${body}${scriptTag}</div>`);
+
+    let deferredScript = '';
+    if (ctx.deferredRegistry.hasEntries()) {
+      const requestId = String(++deferredRequestId);
+      pendingDeferreds.set(requestId, ctx.deferredRegistry.entries());
+      setTimeout(() => pendingDeferreds.delete(requestId), 60_000);
+      deferredScript = `<script>(function(){` +
+        `var d=parent.document;` +
+        `fetch('/__hzml/deferred/${requestId}').then(function(r){` +
+        `var reader=r.body.getReader(),decoder=new TextDecoder(),buf='';` +
+        `function pump(){reader.read().then(function(result){` +
+        `if(result.done){if(buf.trim())swap(buf.trim());return}` +
+        `buf+=decoder.decode(result.value,{stream:true});` +
+        `var lines=buf.split('\\n');buf=lines.pop();` +
+        `lines.filter(Boolean).forEach(swap);pump()})}` +
+        `function swap(line){try{var data=JSON.parse(line);` +
+        `var el=d.getElementById('__s:'+data.id);` +
+        `if(el){var t=d.createElement('template');` +
+        `t.innerHTML=data.html;el.replaceWith(t.content)}}catch(e){}}` +
+        `pump()})` +
+        `})()</script>`;
+    }
+
+    return htmlResponse(`<div id="content">${toggleInputs}${body}${scriptTag}</div>${deferredScript}`);
   }
 
   if (!route.script) {
@@ -288,6 +315,46 @@ return async function handler(req: Request): Promise<Response> {
 
   if (url.pathname === "/__hzml/sse" && sseManager) {
     return sseManager.handler();
+  }
+
+  if (url.pathname.startsWith("/__hzml/deferred/")) {
+    const requestId = url.pathname.slice("/__hzml/deferred/".length);
+    const entries = pendingDeferreds.get(requestId);
+    pendingDeferreds.delete(requestId);
+
+    if (!entries) {
+      return new Response("Not Found", { status: 404 });
+    }
+
+    const encoder = new TextEncoder();
+    const TIMEOUT = 30_000;
+    const timeout = (ms: number) => new Promise<never>((_, rej) =>
+      setTimeout(() => rej(new Error("Deferred timed out")), ms)
+    );
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        await Promise.allSettled(entries.map(entry =>
+          Promise.race([entry.promise, timeout(TIMEOUT)])
+            .then(value => {
+              const rendered = entry.render(value);
+              controller.enqueue(encoder.encode(
+                JSON.stringify({ id: entry.id, html: rendered }) + '\n'
+              ));
+            })
+            .catch(() => {
+              controller.enqueue(encoder.encode(
+                JSON.stringify({ id: entry.id, html: '<div style="color:red;padding:8px;border:1px solid red;border-radius:4px">Failed to load</div>' }) + '\n'
+              ));
+            })
+        ));
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-cache" },
+    });
   }
 
   const staticPath = join(publicDir, url.pathname);
