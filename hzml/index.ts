@@ -4,6 +4,7 @@ import { createSQLiteAdapter, type DatabaseAdapter } from "./db";
 import { createSSEManager, startWatcher, SSE_CLIENT_SCRIPT } from "./dev";
 import { initRouter } from "./router";
 import { resolvePlugins, type HzmlPlugin, type FrameworkContext } from "./plugin";
+import { buildRouteTable, type RouteTable } from "./match";
 
 interface HzmlOptions {
   port?: number;
@@ -33,6 +34,8 @@ export default async function hzml(options: HzmlOptions) {
 
   await router.loadComponents(projectDir);
 
+  let routeTable = await buildRouteTable(routesDir);
+
   const componentsDir = resolve(projectDir, "components");
   const sseManager = createSSEManager();
 
@@ -50,19 +53,21 @@ export default async function hzml(options: HzmlOptions) {
       }
     } else {
       router.clearRouteContext(filePath);
+      routeTable = await buildRouteTable(routesDir);
     }
     sseManager.broadcast("reload");
   });
 
-  const handler = createHandler(routesDir, publicDir, router, sseManager, SSE_CLIENT_SCRIPT);
+  const handler = createHandler(routesDir, publicDir, router, () => routeTable, sseManager, SSE_CLIENT_SCRIPT);
 
   if (globalThis.Bun) {
-    Bun.serve({ port, fetch: handler });
+    Bun.serve({ port, fetch: handler, idleTimeout: 255 });
   } else if (globalThis.Deno) {
     // @ts-ignore: Deno global
     Deno.serve({ port }, handler);
   } else {
     const { createServer } = await import("node:http");
+    const { Readable } = await import("node:stream");
     createServer(async (req, res) => {
       const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
       const headers = new Headers();
@@ -72,7 +77,11 @@ export default async function hzml(options: HzmlOptions) {
       const request = new Request(url, { method: req.method, headers });
       const response = await handler(request);
       res.writeHead(response.status, Object.fromEntries(response.headers));
-      res.end(new Uint8Array(await response.arrayBuffer()));
+      if (response.body) {
+        Readable.fromWeb(response.body as any).pipe(res);
+      } else {
+        res.end();
+      }
     }).listen(port);
   }
 

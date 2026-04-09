@@ -65,6 +65,8 @@ hzml/                 # Framework internals
 
 ## Routes
 
+Routes are `.hzml` files in `routes/`. At startup, the framework scans the directory tree once and builds an in-memory route table. Incoming requests match against this table with zero filesystem I/O — just Map lookups. When a route file is added, removed, or renamed during development, the watcher rebuilds the table automatically.
+
 A route is a `.hzml` file with an optional `<server>` block and a `<template>` block:
 
 ```html
@@ -421,6 +423,32 @@ HZML includes a built-in dev server with hot reload. When the server starts, it 
 - **Errors** render an inline overlay in the browser with the message and stack trace, and log to the terminal in red
 
 No configuration needed — hot reload is always on during development.
+
+## Streaming (in progress)
+
+HZML supports streaming HTML responses using `hzml.defer()` and the `<Suspense>` component. Slow data sources can resolve after the initial page shell is sent, replacing a fallback with the real content when it arrives — similar to Remix's `defer` pattern.
+
+```html
+<server>
+  hzml.get(async () => ({
+    fast: await db.query("SELECT * FROM cache"),
+    slow: hzml.defer(fetch("https://slow-api.example.com").then(r => r.json())),
+  }))
+</server>
+
+<template>
+  <h1>Dashboard</h1>
+  <div>${fast.map(row => html`<p>${row.name}</p>`)}</div>
+
+  <${Suspense} await=${slow} fallback=${html`<div class="animate-pulse h-24"></div>`}>
+    ${(data) => html`<ul>${data.map(item => html`<li>${item.name}</li>`)}</ul>`}
+  <//>
+</template>
+```
+
+`hzml.defer()` wraps a Promise. The template renders immediately with the fallback, and the server holds the connection open. When the promise resolves, a `<template>` + `<script>` chunk is flushed that swaps the fallback for the real content. Deferred promises time out after 30 seconds.
+
+**Current UX issues:** Streaming works on direct navigation (typing a URL or refreshing the page) — you see the page shell with fallbacks, then deferred content swaps in as it resolves. However, when navigating via HTMZ (clicking a link from another page), the iframe partial path awaits all deferred data before sending the response. This means in-app navigation to a page with slow deferrals blocks until everything resolves — no fallbacks, no progressive rendering. The two paths behave differently for the same route.
 
 ## Runtime
 

@@ -3,6 +3,7 @@
 ## Done
 - Runtime-agnostic handler (Bun/Deno/Node)
 - File-based routing with nested directories
+- In-memory route table: filesystem scanned once at startup, Map-based matching per request, rebuilt on file changes
 - Dynamic params ($id)
 - Nested layouts (layout.hzml at any level)
 - htm templating with server-side string rendering
@@ -45,7 +46,7 @@
 ## Next
 - Request-scoped query cache: dedupe identical db queries within a single render pass (Map on RenderContext, dies when request ends — no invalidation needed)
 - HTMZ append mode: data-hzml-append="target-id" on response elements appends children instead of replacing (load more, chat, infinite scroll — opt-in, server still authoritative on refresh)
-- SSE / streaming: deferred data with resolveData seam (Remix-style defer pattern)
+- SSE / streaming: hzml.defer() + Suspense component works on full-page loads (progressive streaming via ReadableStream). HTMZ partial path (iframe navigation) still awaits all deferred data before responding — needs streaming partial support.
 - Head tag architecture (per-route title, meta — full page only, title updates on HTMZ nav)
 - Plugin system for injected modules (hzml.config.js)
 - Import resolution in script blocks (currently stripped)
