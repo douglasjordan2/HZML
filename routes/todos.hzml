@@ -43,4 +43,8 @@
     `}
   </div>
 
+  <${Fill} channel="todo-count">
+    <${TodoCount} class="bg-black text-white text-xs rounded-full px-1.5 py-0.5" />
+  <//>
+
 </template>
