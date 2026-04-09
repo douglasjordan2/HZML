@@ -1,4 +1,4 @@
-export function htmz(body: string, head = "", scripts = "", devClient = ""): string {
+export function htmzHead(): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,11 +6,13 @@ export function htmz(body: string, head = "", scripts = "", devClient = ""): str
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HZML</title>
   <link rel="stylesheet" href="/app.css">
-  ${head}
 </head>
 <body class="group/root">
-  ${body}
-  <script>
+`;
+}
+
+export function htmzTail(scripts = "", devClient = ""): string {
+  return `  <script>
     window.hzml = {
       get: function(name) {
         var el = document.querySelector('[data-d="' + name + '"]');
@@ -53,4 +55,19 @@ export function htmz(body: string, head = "", scripts = "", devClient = ""): str
   <iframe hidden name="htmz" onload="window.htmz(this)"></iframe>
 </body>
 </html>`;
+}
+
+export function htmz(body: string, head = "", scripts = "", devClient = ""): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HZML</title>
+  <link rel="stylesheet" href="/app.css">
+  ${head}
+</head>
+<body class="group/root">
+  ${body}
+` + htmzTail(scripts, devClient);
 }

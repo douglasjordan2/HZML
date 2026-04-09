@@ -71,6 +71,7 @@ export function startWatcher(
           } catch {
             pending.kind = "delete";
           }
+          console.log(`\x1b[33m[watcher] ${pending.kind}: ${pending.filePath}\x1b[0m`);
           onChange(pending.filePath, pending.kind);
           pending = null;
         }, 50);
@@ -106,9 +107,5 @@ export const SSE_CLIENT_SCRIPT = `<script>
 (function() {
   var es = new EventSource('/__hzml/sse');
   es.addEventListener('reload', function() { location.reload(); });
-  es.onerror = function() {
-    es.close();
-    setTimeout(function() { location.reload(); }, 1000);
-  };
 })();
 </script>`;

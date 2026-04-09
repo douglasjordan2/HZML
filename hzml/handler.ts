@@ -2,9 +2,11 @@ import { join, extname } from "path";
 import { readFile, writeFile } from "fs/promises";
 import { parseRoute } from "./router";
 import type { HzmlRouter } from "./router";
-import { createToggleRegistry, type RenderContext } from "./state";
-import { htmz } from "./htmz";
-import { matchRoute, fileExists, type RouteMatch } from "./match";
+import { createToggleRegistry, createDeferredRegistry, type RenderContext } from "./state";
+import { isDeferred } from "./deferred";
+import type { Deferred } from "./deferred";
+import { htmzHead, htmzTail } from "./htmz";
+import { matchFromTable, fileExists, type RouteMatch, type RouteTable } from "./match";
 import { renderErrorOverlay } from "./dev";
 
 const MIME_TYPES: Record<string, string> = {
@@ -17,7 +19,7 @@ const MIME_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-export function createHandler(routesDir: string, publicDir: string, router: HzmlRouter, sseManager?: { handler(): Response }, devClientScript?: string) {
+export function createHandler(routesDir: string, publicDir: string, router: HzmlRouter, getRouteTable: () => RouteTable, sseManager?: { handler(): Response }, devClientScript?: string) {
 
 const manifestPath = join(routesDir, "..", ".toggle-manifest");
 const manifestClasses = new Set<string>();
@@ -69,7 +71,7 @@ function generateToggleCSS(body: string): string {
 async function resolveData(data: Record<string, unknown>): Promise<Record<string, unknown>> {
   const entries = Object.entries(data);
   const resolved = await Promise.all(
-    entries.map(async ([k, v]) => [k, v instanceof Promise ? await v : v])
+    entries.map(async ([k, v]) => [k, isDeferred(v) ? v : (v instanceof Promise ? await v : v)])
   );
   return Object.fromEntries(resolved);
 }
@@ -126,57 +128,158 @@ function htmlResponse(body: string): Response {
 async function renderRoute(match: RouteMatch, isPartial: boolean, request: Request): Promise<Response> {
   const ctx: RenderContext = {
     toggleRegistry: createToggleRegistry(),
+    deferredRegistry: createDeferredRegistry(),
   };
   const source = await readFile(match.filePath, "utf-8");
   const route = parseRoute(source);
-
-  let body: string;
   const clientScript = route.clientScript || '';
 
-  if (route.script) {
-    const data = await router.executeScript(route.script, request, match.params, match.filePath);
-
-    if (data?.__redirect) {
-      return Response.redirect(data.__redirect, 302);
-    }
-
-    const resolved = await resolveData(data);
-    body = route.template ? router.renderTemplate(route.template, resolved, ctx) : "";
-  } else {
-    body = route.template ? router.renderTemplate(route.template, {}, ctx) : source;
-  }
-
-  const scriptTag = clientScript ? `<script>${clientScript}</script>` : '';
-
-  const [rootLayout, ...nestedLayouts] = match.layouts;
-
-  for (const layoutPath of nestedLayouts.reverse()) {
-    const source = await readFile(layoutPath, "utf-8");
-    const layout = parseRoute(source);
-    const tmpl = layout.template || source;
-    body = router.renderTemplate(tmpl, { children: body }, ctx);
-  }
-
   if (isPartial) {
+    let body: string;
+    if (route.script) {
+      const data = await router.executeScript(route.script, request, match.params, match.filePath);
+      if (data?.__redirect) return Response.redirect(data.__redirect, 302);
+      const resolved = await resolveData(data);
+      for (const [k, v] of Object.entries(resolved)) {
+        if (isDeferred(v)) {
+          try { resolved[k] = await (v as Deferred).promise; } catch { resolved[k] = undefined; }
+        }
+      }
+      body = route.template ? router.renderTemplate(route.template, resolved, ctx) : "";
+    } else {
+      body = route.template ? router.renderTemplate(route.template, {}, ctx) : source;
+    }
+    const scriptTag = clientScript ? `<script>${clientScript}</script>` : '';
+    const [, ...nestedLayouts] = match.layouts;
+    for (const layoutPath of nestedLayouts.reverse()) {
+      const src = await readFile(layoutPath, "utf-8");
+      const layout = parseRoute(src);
+      body = router.renderTemplate(layout.template || src, { children: body }, ctx);
+    }
     const toggleInputs = ctx.toggleRegistry.emit();
     return htmlResponse(`<div id="content">${toggleInputs}${body}${scriptTag}</div>`);
   }
 
-  if (rootLayout) {
-    const source = await readFile(rootLayout, "utf-8");
-    const layout = parseRoute(source);
-    const tmpl = layout.template || source;
-    body = router.renderTemplate(tmpl, { children: body }, ctx);
-    body = mergeChannels(body);
+  if (!route.script) {
+    let body = route.template ? router.renderTemplate(route.template, {}, ctx) : source;
+    const scriptTag = clientScript ? `<script>${clientScript}</script>` : '';
+    const [rootLayout, ...nestedLayouts] = match.layouts;
+    for (const layoutPath of nestedLayouts.reverse()) {
+      const src = await readFile(layoutPath, "utf-8");
+      const layout = parseRoute(src);
+      body = router.renderTemplate(layout.template || src, { children: body }, ctx);
+    }
+    if (rootLayout) {
+      const src = await readFile(rootLayout, "utf-8");
+      const layout = parseRoute(src);
+      body = router.renderTemplate(layout.template || src, { children: body }, ctx);
+      body = mergeChannels(body);
+    }
+    const toggleInputs = ctx.toggleRegistry.emit();
+    if (toggleInputs) body = toggleInputs + '\n' + body;
+    const toggleCSS = generateToggleCSS(body);
+    updateToggleManifest(body);
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(htmzHead()));
+        controller.enqueue(encoder.encode(toggleCSS + body));
+        controller.enqueue(encoder.encode(htmzTail(scriptTag, devClientScript ?? "")));
+        controller.close();
+      }
+    });
+    return new Response(stream, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
   }
 
-  const toggleInputs = ctx.toggleRegistry.emit();
-  if (toggleInputs) {
-    body = toggleInputs + '\n' + body;
-  }
-  const toggleCSS = generateToggleCSS(body);
-  updateToggleManifest(body);
-  return htmlResponse(htmz(body, toggleCSS, scriptTag, devClientScript ?? ""));
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      controller.enqueue(encoder.encode(htmzHead()));
+
+      try {
+        const data = await router.executeScript(route.script!, request, match.params, match.filePath);
+
+        if (data?.__redirect) {
+          const url = data.__redirect as string;
+          controller.enqueue(encoder.encode(
+            `<meta http-equiv="refresh" content="0;url=${encodeURI(url)}">`+
+            `<script>location.replace(${JSON.stringify(url)})</script>`
+          ));
+          controller.enqueue(encoder.encode(htmzTail("", "")));
+          controller.close();
+          return;
+        }
+
+        const resolved = await resolveData(data);
+        let body = route.template ? router.renderTemplate(route.template, resolved, ctx) : "";
+        const scriptTag = clientScript ? `<script>${clientScript}</script>` : '';
+        const [rootLayout, ...nestedLayouts] = match.layouts;
+
+        for (const layoutPath of nestedLayouts.reverse()) {
+          const src = await readFile(layoutPath, "utf-8");
+          const layout = parseRoute(src);
+          body = router.renderTemplate(layout.template || src, { children: body }, ctx);
+        }
+
+        if (rootLayout) {
+          const src = await readFile(rootLayout, "utf-8");
+          const layout = parseRoute(src);
+          body = router.renderTemplate(layout.template || src, { children: body }, ctx);
+          body = mergeChannels(body);
+        }
+
+        const toggleInputs = ctx.toggleRegistry.emit();
+        if (toggleInputs) body = toggleInputs + '\n' + body;
+        const toggleCSS = generateToggleCSS(body);
+        updateToggleManifest(body);
+
+        controller.enqueue(encoder.encode(toggleCSS + body));
+
+        if (ctx.deferredRegistry.hasEntries()) {
+          const deferredEntries = ctx.deferredRegistry.entries();
+          const TIMEOUT = 30_000;
+          const timeout = (ms: number) => new Promise<never>((_, rej) =>
+            setTimeout(() => rej(new Error("Deferred timed out")), ms)
+          );
+
+          await Promise.allSettled(deferredEntries.map(entry =>
+            Promise.race([entry.promise, timeout(TIMEOUT)])
+              .then(value => {
+                const rendered = entry.render(value);
+                controller.enqueue(encoder.encode(
+                  `<template id="__s:${entry.id}:r">${rendered}</template>` +
+                  `<script>(function(){var t=document.getElementById('__s:${entry.id}:r'),` +
+                  `p=document.getElementById('__s:${entry.id}');` +
+                  `if(p&&t){p.replaceWith(t.content);t.remove()}})()</script>`
+                ));
+              })
+              .catch(() => {
+                controller.enqueue(encoder.encode(
+                  `<template id="__s:${entry.id}:r"><div style="color:red;padding:8px;border:1px solid red;border-radius:4px">Failed to load</div></template>` +
+                  `<script>(function(){var t=document.getElementById('__s:${entry.id}:r'),` +
+                  `p=document.getElementById('__s:${entry.id}');` +
+                  `if(p&&t){p.replaceWith(t.content);t.remove()}})()</script>`
+                ));
+              })
+          ));
+        }
+
+        controller.enqueue(encoder.encode(htmzTail(scriptTag, devClientScript ?? "")));
+      } catch (err) {
+        console.error(`\x1b[31m[hzml] Error rendering ${match.filePath}:\x1b[0m`, err);
+        controller.enqueue(encoder.encode(renderErrorOverlay(err, match.filePath)));
+        controller.enqueue(encoder.encode(htmzTail("", devClientScript ?? "")));
+      }
+
+      controller.close();
+    }
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
 }
 
 return async function handler(req: Request): Promise<Response> {
@@ -196,7 +299,7 @@ return async function handler(req: Request): Promise<Response> {
     });
   }
 
-  const match = await matchRoute(routesDir, url.pathname);
+  const match = matchFromTable(getRouteTable(), url.pathname);
   if (!match) {
     return new Response("Not Found", { status: 404 });
   }
@@ -206,7 +309,21 @@ return async function handler(req: Request): Promise<Response> {
   } catch (err) {
     console.error(`\x1b[31m[hzml] Error rendering ${match.filePath}:\x1b[0m`, err);
     const overlay = renderErrorOverlay(err, match.filePath);
-    return htmlResponse(htmz(overlay, "", "", devClientScript ?? ""));
+    if (isPartial) {
+      return htmlResponse(overlay);
+    }
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(htmzHead()));
+        controller.enqueue(encoder.encode(overlay));
+        controller.enqueue(encoder.encode(htmzTail("", devClientScript ?? "")));
+        controller.close();
+      }
+    });
+    return new Response(stream, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
   }
 };
 

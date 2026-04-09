@@ -1,0 +1,42 @@
+<server>
+  const sleep = (ms, val) => new Promise(r => setTimeout(() => r(val), ms))
+
+  hzml.get(async () => ({
+    title: "Suspense Demo",
+    fast: hzml.defer(sleep(500, [
+      { name: "Web Streams API", status: "ReadableStream" },
+      { name: "TextEncoder", status: "Uint8Array chunks" },
+    ])),
+    slow: hzml.defer(sleep(2000, [
+      { name: "node:stream", status: "Not imported" },
+      { name: "Buffer", status: "Not used" },
+    ])),
+  }))
+</server>
+
+<template>
+  <div>
+    <h1 class="text-3xl font-bold mb-2">${title}</h1>
+    <p class="text-gray-500 mb-6">Watch the sections fill in as data arrives.</p>
+
+    <h2 class="text-xl font-semibold mb-3">Fast (500ms)</h2>
+    <${Suspense} await=${fast} fallback=${html`<div class="animate-pulse bg-gray-100 rounded h-24 mb-6"></div>`}>
+      ${(data) => html`<ul class="space-y-2 mb-6">${data.map(s => html`
+        <li class="flex justify-between px-4 py-3 bg-gray-50 rounded">
+          <span class="font-medium">${s.name}</span>
+          <span class="text-gray-500">${s.status}</span>
+        </li>
+      `)}</ul>`}
+    <//>
+
+    <h2 class="text-xl font-semibold mb-3">Slow (2s)</h2>
+    <${Suspense} await=${slow} fallback=${html`<div class="animate-pulse bg-gray-100 rounded h-24"></div>`}>
+      ${(data) => html`<ul class="space-y-2">${data.map(s => html`
+        <li class="flex justify-between px-4 py-3 bg-green-50 rounded">
+          <span class="font-medium">${s.name}</span>
+          <span class="text-gray-500">${s.status}</span>
+        </li>
+      `)}</ul>`}
+    <//>
+  </div>
+</template>

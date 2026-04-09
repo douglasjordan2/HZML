@@ -1,5 +1,6 @@
 export interface RenderContext {
   toggleRegistry: ToggleRegistry;
+  deferredRegistry: DeferredRegistry;
 }
 
 interface ToggleEntry {
@@ -12,6 +13,34 @@ interface ToggleEntry {
 interface ToggleRegistry {
   register(id: string, name?: string, checked?: boolean): void;
   emit(): string;
+}
+
+interface DeferredEntry {
+  id: number;
+  promise: Promise<unknown>;
+  render: (data: unknown) => string;
+}
+
+interface DeferredRegistry {
+  register(id: number, promise: Promise<unknown>, render: (data: unknown) => string): void;
+  entries(): DeferredEntry[];
+  hasEntries(): boolean;
+}
+
+export function createDeferredRegistry(): DeferredRegistry {
+  const items: DeferredEntry[] = [];
+
+  return {
+    register(id, promise, render) {
+      items.push({ id, promise, render });
+    },
+    entries() {
+      return items;
+    },
+    hasEntries() {
+      return items.length > 0;
+    },
+  };
 }
 
 export function createToggleRegistry(): ToggleRegistry {

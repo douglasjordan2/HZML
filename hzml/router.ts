@@ -4,6 +4,7 @@ import htm from "htm";
 import { html, h as baseH, type HtmlChild, type PropValue } from "./render";
 import type { RenderContext } from "./state";
 import type { FrameworkContext } from "./plugin";
+import { Deferred, isDeferred } from "./deferred";
 
 const BUILT_IN_COMPONENTS = join(import.meta.dirname ?? import.meta.dir, "components");
 
@@ -286,6 +287,25 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
 
       return `<${tag} class="${classes}">${children}</${tag}>`;
     };
+
+    componentCache['Suspense'] = (props: Record<string, unknown>, ctx?: RenderContext) => {
+      const awaited = props.await;
+      const fallback = (props.fallback as string) || '';
+      const children = Array.isArray(props.children)
+        ? (props.children as unknown[]).flat(Infinity).filter((c: unknown) => c != null && typeof c !== 'boolean')
+        : [];
+      const renderFn = children.find(c => typeof c === 'function') as
+        ((data: unknown) => string) | undefined;
+
+      if (!renderFn) return fallback;
+
+      if (!isDeferred(awaited)) return renderFn(awaited);
+
+      if (ctx?.deferredRegistry) {
+        ctx.deferredRegistry.register(awaited.id, awaited.promise, renderFn);
+      }
+      return `<div id="__s:${awaited.id}">${fallback}</div>`;
+    };
   }
 
   async function reloadComponent(name: string, filePath: string) {
@@ -351,7 +371,8 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
 
     const clean = script.replace(/^import\s.*$/gm, "");
 
-    const hzml = { get, post, redirect, db: frameworkCtx.db, ...frameworkCtx.extensions };
+    const defer = <T>(promise: Promise<T>) => new Deferred(promise);
+    const hzml = { get, post, redirect, defer, db: frameworkCtx.db, ...frameworkCtx.extensions };
 
     const injectionKeys = Object.keys(frameworkCtx.injections).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
     const injectionValues = injectionKeys.map(k => frameworkCtx.injections[k]);
