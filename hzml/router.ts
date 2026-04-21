@@ -2,7 +2,7 @@ import { join, basename } from "path";
 import { readdir, readFile } from "fs/promises";
 import htm from "htm";
 import { html, h as baseH, type HtmlChild, type PropValue } from "./render";
-import type { RenderContext } from "./state";
+import { renderStorage, type RenderContext } from "./state";
 import type { FrameworkContext } from "./plugin";
 import { Deferred, isDeferred } from "./deferred";
 
@@ -118,7 +118,13 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
   }
 
   function buildLoaderHzml() {
-    return { db: frameworkCtx.db, ...frameworkCtx.extensions };
+    const obj: Record<string, unknown> = { ...frameworkCtx.extensions };
+    Object.defineProperty(obj, 'db', {
+      enumerable: true,
+      configurable: true,
+      get: () => renderStorage.getStore()?.db ?? frameworkCtx.db,
+    });
+    return obj;
   }
 
   async function loadFromDir(dir: string) {
@@ -372,7 +378,12 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
     const clean = script.replace(/^import\s.*$/gm, "");
 
     const defer = <T>(promise: Promise<T>) => new Deferred(promise);
-    const hzml = { get, post, redirect, defer, db: frameworkCtx.db, ...frameworkCtx.extensions };
+    const hzml: Record<string, unknown> = { get, post, redirect, defer, ...frameworkCtx.extensions };
+    Object.defineProperty(hzml, 'db', {
+      enumerable: true,
+      configurable: true,
+      get: () => renderStorage.getStore()?.db ?? frameworkCtx.db,
+    });
 
     const injectionKeys = Object.keys(frameworkCtx.injections).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
     const injectionValues = injectionKeys.map(k => frameworkCtx.injections[k]);

@@ -2,7 +2,7 @@ import { join, extname } from "path";
 import { readFile, writeFile } from "fs/promises";
 import { parseRoute } from "./router";
 import type { HzmlRouter } from "./router";
-import { createToggleRegistry, createDeferredRegistry, type RenderContext } from "./state";
+import { createToggleRegistry, createDeferredRegistry, createQueryCache, renderStorage, type RenderContext } from "./state";
 import { isDeferred } from "./deferred";
 import type { Deferred } from "./deferred";
 import { htmzHead, htmzTail } from "./htmz";
@@ -138,7 +138,13 @@ async function renderRoute(match: RouteMatch, isPartial: boolean, request: Reque
   const ctx: RenderContext = {
     toggleRegistry: createToggleRegistry(),
     deferredRegistry: createDeferredRegistry(),
+    db: router.db ? createQueryCache(router.db) : undefined,
   };
+
+  return renderStorage.run(ctx, () => renderRouteInner(match, isPartial, request, ctx));
+}
+
+async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: Request, ctx: RenderContext): Promise<Response> {
   const source = await readFile(match.filePath, "utf-8");
   const route = parseRoute(source);
   const clientScript = route.clientScript || '';

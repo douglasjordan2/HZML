@@ -384,6 +384,10 @@ SQLite is the default database — zero config, zero dependencies on Bun. Availa
 
 Data persists in `data.db` at the project root.
 
+### Request-scoped query cache
+
+Within a single request, identical SQL queries are deduplicated automatically. If two components both call `hzml.db.query("SELECT COUNT(*) FROM todos")` during the same render, only the first actually hits the database. The cache is a Map keyed by `sql + JSON.stringify(params)`, lives on the per-request `RenderContext`, and is garbage collected when the request ends — no invalidation, no TTL, no stale data across requests. Any `run()` (write) within the request clears the cache, so reads after writes always see fresh data.
+
 ### Custom database
 
 Pass any object that implements `DatabaseAdapter` to use a different database:

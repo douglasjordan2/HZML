@@ -1,6 +1,34 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+import type { DatabaseAdapter } from "./db";
+
 export interface RenderContext {
   toggleRegistry: ToggleRegistry;
   deferredRegistry: DeferredRegistry;
+  db?: DatabaseAdapter;
+}
+
+export const renderStorage = new AsyncLocalStorage<RenderContext>();
+
+export function createQueryCache(underlying: DatabaseAdapter): DatabaseAdapter {
+  const cache = new Map<string, unknown>();
+
+  const key = (sql: string, params?: unknown[]) =>
+    sql + '\0' + JSON.stringify(params ?? []);
+
+  return {
+    query(sql, params) {
+      const k = key(sql, params as unknown[]);
+      if (cache.has(k)) return cache.get(k) as never;
+      const result = underlying.query(sql, params);
+      cache.set(k, result);
+      return result;
+    },
+    run(sql, params) {
+      cache.clear();
+      return underlying.run(sql, params);
+    },
+    close() {},
+  };
 }
 
 interface ToggleEntry {
