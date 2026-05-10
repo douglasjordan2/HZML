@@ -6,7 +6,8 @@ export interface HzmlPlugin {
 }
 
 export interface PluginContext {
-  db: DatabaseAdapter | undefined;
+  readonly db: DatabaseAdapter | undefined;
+  setDb: (db: DatabaseAdapter) => void;
   projectDir: string;
   extend: (key: string, value: unknown) => void;
   inject: (key: string, value: unknown) => void;
@@ -20,15 +21,17 @@ export interface FrameworkContext {
 
 export async function resolvePlugins(
   plugins: HzmlPlugin[],
-  db: DatabaseAdapter | undefined,
+  initialDb: DatabaseAdapter | undefined,
   projectDir: string,
-): Promise<{ extensions: Record<string, unknown>; injections: Record<string, unknown> }> {
+): Promise<{ db: DatabaseAdapter | undefined; extensions: Record<string, unknown>; injections: Record<string, unknown> }> {
+  let db = initialDb;
   const extensions: Record<string, unknown> = {};
   const injections: Record<string, unknown> = {};
 
   for (const plugin of plugins) {
     const ctx: PluginContext = {
-      db,
+      get db() { return db; },
+      setDb: (next) => { db = next; },
       projectDir,
       extend: (key, value) => { extensions[key] = value; },
       inject: (key, value) => { injections[key] = value; },
@@ -36,5 +39,5 @@ export async function resolvePlugins(
     await plugin.setup(ctx);
   }
 
-  return { extensions, injections };
+  return { db, extensions, injections };
 }

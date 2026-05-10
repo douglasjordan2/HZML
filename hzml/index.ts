@@ -27,9 +27,9 @@ export default async function hzml(options: HzmlOptions) {
   const routesDir = resolve(projectDir, "routes");
   const publicDir = resolve(projectDir, "public");
 
-  const { extensions, injections } = await resolvePlugins(options.plugins ?? [], db, projectDir);
+  const resolved = await resolvePlugins(options.plugins ?? [], db, projectDir);
 
-  const frameworkCtx: FrameworkContext = { db, extensions, injections };
+  const frameworkCtx: FrameworkContext = { db: resolved.db, extensions: resolved.extensions, injections: resolved.injections };
   const router = initRouter(frameworkCtx);
 
   await router.loadComponents(projectDir);

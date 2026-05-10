@@ -25,6 +25,8 @@
 - Hot reload dev server (SSE file watcher on routes/ + components/, error overlay, component + route cache invalidation)
 - Streaming: hzml.defer() + Suspense on both paths (full-page: ReadableStream chunks, partials: NDJSON side-channel via /__hzml/deferred/:id)
 - Request-scoped query cache: dedupes identical db queries within a render pass via AsyncLocalStorage + Map on RenderContext, cleared on writes
+- Plugin system: HzmlPlugin + PluginContext (extend/inject/setDb) — extend `hzml.*` namespace, inject route-scope identifiers, replace the db at startup
+- Import resolution in `<server>` blocks: ES `import` statements transformed to `await import(...)` via AsyncFunction registration (default, named, namespace, side-effect forms all supported)
 
 ## Client Reactivity
 - Toggle system: Toggled + Toggler components, hidden checkbox/radio state, CSS :has() reactivity ✓
@@ -48,9 +50,8 @@
 ## Next
 - HTMZ append mode: data-hzml-append="target-id" on response elements appends children instead of replacing (load more, chat, infinite scroll — opt-in, server still authoritative on refresh)
 - Head tag architecture (per-route title, meta — full page only, title updates on HTMZ nav)
-- Plugin system for injected modules (hzml.config.js)
-- Import resolution in script blocks (currently stripped)
 - Tree-sitter v2: custom template parsing for HTM syntax (${expr}, <${Component}>, <//> highlighting)
+- Async loaders: today component `<loader>` blocks are sync. Lifting that requires propagating Promise<string> through h()/htm — real refactor, deferred until a real use case demands it.
 
 ## Package as a real framework
 - Separate framework from demo (move routes/, public/, app.css, index.ts into examples/)

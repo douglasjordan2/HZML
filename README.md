@@ -111,6 +111,27 @@ Server blocks receive a single `hzml` object with everything injected:
 </server>
 ```
 
+### Imports in server blocks
+
+Server blocks support ES `import` statements. Imports are transformed to dynamic `await import(...)` at registration time, so any package, file, or built-in module is available:
+
+```html
+<server>
+  import { readFile } from "fs/promises";
+  import postgres from "postgres";
+
+  const sql = postgres(process.env.DATABASE_URL);
+
+  hzml.get(async () => {
+    const config = JSON.parse(await readFile("./site.json", "utf-8"));
+    const rows = await sql`select * from posts limit ${config.feedSize}`;
+    return { config, rows };
+  });
+</server>
+```
+
+Default, named, namespace, and side-effect imports all work. Imports run once per route, when the route is first registered.
+
 ### Dynamic params
 
 Name a file with `$` prefix — `$id.hzml` matches `/blog/anything` and exposes `request.params.id`:
@@ -417,6 +438,36 @@ Async adapters work — route handlers can be async too:
   })
 </server>
 ```
+
+## Plugins
+
+Plugins extend the `hzml.*` namespace, swap the database adapter, or inject identifiers directly into route scope. They run once at startup, before any routes are registered.
+
+```typescript
+import hzml from "./hzml";
+import type { HzmlPlugin } from "./hzml/plugin";
+
+const myPlugin: HzmlPlugin = {
+  name: "my-plugin",
+  setup(ctx) {
+    ctx.extend("now", () => new Date());           // hzml.now() in server/loader blocks
+    ctx.inject("VERSION", "1.0.0");                // VERSION as a top-level identifier in server blocks
+    ctx.setDb({ /* DatabaseAdapter */ });          // replace the default db
+  },
+};
+
+hzml({ port: 4965, plugins: [myPlugin] });
+```
+
+`PluginContext`:
+
+- **`ctx.extend(key, value)`** — adds `value` to the `hzml` namespace as `hzml[key]`. Available in both `<server>` blocks and component `<loader>` blocks.
+- **`ctx.inject(key, value)`** — adds `value` as a top-level identifier in route `<server>` blocks (no `hzml.` prefix needed). Useful for things that should look like language primitives.
+- **`ctx.setDb(adapter)`** — replaces `hzml.db` for the rest of startup.
+- **`ctx.db`** (read-only) — the currently configured database adapter.
+- **`ctx.projectDir`** — absolute path to the project root.
+
+See [`examples/ghostpres-plugin.ts`](./examples/ghostpres-plugin.ts) for a real plugin that wires up [GhostPress](https://github.com/douglasjordan2/ghostpres) — a Postgres jsonb pipeline DSL — as both `hzml.ghost` (for queries) and the `hzml.db` adapter (for raw SQL).
 
 ## Dev Server
 

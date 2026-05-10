@@ -97,9 +97,59 @@ interface RouteContext {
   postHandler: RouteHandler | null;
 }
 
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as
+  new (...args: string[]) => (...args: unknown[]) => Promise<unknown>;
+
+function transformImports(script: string): string {
+  let counter = 0;
+  const next = () => `__hz_imp_${counter++}`;
+
+  let out = script.replace(
+    /^[ \t]*import\s+(['"][^'"]+['"])\s*;?\s*$/gm,
+    (_, source) => `await import(${source});`,
+  );
+
+  out = out.replace(
+    /^[ \t]*import\s+(.+?)\s+from\s+(['"][^'"]+['"])\s*;?\s*$/gm,
+    (_, raw, source) => {
+      const binding = raw.trim();
+
+      const ns = binding.match(/^\*\s+as\s+(\w+)$/);
+      if (ns) return `const ${ns[1]} = await import(${source});`;
+
+      const mixedNs = binding.match(/^(\w+)\s*,\s*\*\s+as\s+(\w+)$/);
+      if (mixedNs) {
+        const tmp = next();
+        return `const ${tmp} = await import(${source}); const ${mixedNs[1]} = ${tmp}.default; const ${mixedNs[2]} = ${tmp};`;
+      }
+
+      const mixed = binding.match(/^(\w+)\s*,\s*\{([^}]+)\}$/);
+      if (mixed) {
+        const tmp = next();
+        const named = mixed[2].replace(/(\w+)\s+as\s+(\w+)/g, "$1: $2");
+        return `const ${tmp} = await import(${source}); const ${mixed[1]} = ${tmp}.default; const {${named}} = ${tmp};`;
+      }
+
+      const named = binding.match(/^\{([^}]+)\}$/);
+      if (named) {
+        const renamed = named[1].replace(/(\w+)\s+as\s+(\w+)/g, "$1: $2");
+        return `const {${renamed}} = await import(${source});`;
+      }
+
+      if (/^\w+$/.test(binding)) {
+        return `const ${binding} = (await import(${source})).default;`;
+      }
+
+      return `/* hzml: unparsed import "${binding}" */`;
+    },
+  );
+
+  return out;
+}
+
 export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
   const componentCache: Record<string, ComponentFn> = {};
-  const routeContexts: Record<string, RouteContext> = {};
+  const routeContexts: Record<string, Promise<RouteContext>> = {};
 
   function clearComponentCache(name?: string) {
     if (name) {
@@ -365,35 +415,37 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
     };
   }
 
-  function getRouteContext(script: string, filePath: string): RouteContext {
+  function getRouteContext(script: string, filePath: string): Promise<RouteContext> {
     if (routeContexts[filePath]) return routeContexts[filePath];
 
-    let getHandler: RouteHandler | null = null;
-    let postHandler: RouteHandler | null = null;
+    routeContexts[filePath] = (async () => {
+      let getHandler: RouteHandler | null = null;
+      let postHandler: RouteHandler | null = null;
 
-    const get = (fn: RouteHandler) => { getHandler = fn; };
-    const post = (fn: RouteHandler) => { postHandler = fn; };
-    const redirect = (url: string) => ({ __redirect: url });
+      const get = (fn: RouteHandler) => { getHandler = fn; };
+      const post = (fn: RouteHandler) => { postHandler = fn; };
+      const redirect = (url: string) => ({ __redirect: url });
 
-    const clean = script.replace(/^import\s.*$/gm, "");
+      const transformed = transformImports(script);
 
-    const defer = <T>(promise: Promise<T>) => new Deferred(promise);
-    const hzml: Record<string, unknown> = { get, post, redirect, defer, ...frameworkCtx.extensions };
-    Object.defineProperty(hzml, 'db', {
-      enumerable: true,
-      configurable: true,
-      get: () => renderStorage.getStore()?.db ?? frameworkCtx.db,
-    });
+      const defer = <T>(promise: Promise<T>) => new Deferred(promise);
+      const hzml: Record<string, unknown> = { get, post, redirect, defer, ...frameworkCtx.extensions };
+      Object.defineProperty(hzml, 'db', {
+        enumerable: true,
+        configurable: true,
+        get: () => renderStorage.getStore()?.db ?? frameworkCtx.db,
+      });
 
-    const injectionKeys = Object.keys(frameworkCtx.injections).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
-    const injectionValues = injectionKeys.map(k => frameworkCtx.injections[k]);
+      const injectionKeys = Object.keys(frameworkCtx.injections).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
+      const injectionValues = injectionKeys.map(k => frameworkCtx.injections[k]);
 
-    const register = new Function("hzml", ...injectionKeys, clean);
-    register(hzml, ...injectionValues);
+      const register = new AsyncFunction("hzml", ...injectionKeys, transformed);
+      await register(hzml, ...injectionValues);
 
-    const ctx = { getHandler, postHandler };
-    routeContexts[filePath] = ctx;
-    return ctx;
+      return { getHandler, postHandler };
+    })();
+
+    return routeContexts[filePath];
   }
 
   async function executeScript(
@@ -402,7 +454,7 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
     params: Record<string, string> = {},
     filePath: string = "",
   ): Promise<Record<string, unknown>> {
-    const { getHandler, postHandler } = getRouteContext(script, filePath);
+    const { getHandler, postHandler } = await getRouteContext(script, filePath);
 
     const method = request.method.toLowerCase();
 
