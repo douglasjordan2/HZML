@@ -12,9 +12,10 @@ interface HzmlOptions {
   plugins?: HzmlPlugin[];
 }
 
-export default async function hzml(options: HzmlOptions) {
-  const port = options.port ?? 4965;
-  const dbConfig = typeof options === "number" ? undefined : options.db;
+export default async function hzml(options: HzmlOptions | number = {}) {
+  const opts: HzmlOptions = typeof options === "number" ? { port: options } : options;
+  const port = opts.port ?? 4965;
+  const dbConfig = opts.db;
 
   let db: DatabaseAdapter | undefined;
   if (dbConfig?.provider && typeof dbConfig.provider !== "string") {
@@ -27,7 +28,7 @@ export default async function hzml(options: HzmlOptions) {
   const routesDir = resolve(projectDir, "routes");
   const publicDir = resolve(projectDir, "public");
 
-  const resolved = await resolvePlugins(options.plugins ?? [], db, projectDir);
+  const resolved = await resolvePlugins(opts.plugins ?? [], db, projectDir);
 
   const frameworkCtx: FrameworkContext = { db: resolved.db, extensions: resolved.extensions, injections: resolved.injections };
   const router = initRouter(frameworkCtx);

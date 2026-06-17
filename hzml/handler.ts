@@ -7,6 +7,7 @@ import { isDeferred } from "./deferred";
 import type { Deferred } from "./deferred";
 import { htmzHead, htmzTail } from "./htmz";
 import { matchFromTable, fileExists, type RouteMatch, type RouteTable } from "./match";
+import { raw } from "./render";
 import { renderErrorOverlay } from "./dev";
 
 const MIME_TYPES: Record<string, string> = {
@@ -27,7 +28,6 @@ interface PendingDeferredEntry {
 
 export function createHandler(routesDir: string, publicDir: string, router: HzmlRouter, getRouteTable: () => RouteTable, sseManager?: { handler(): Response }, devClientScript?: string) {
 
-let deferredRequestId = 0;
 const pendingDeferreds = new Map<string, PendingDeferredEntry[]>();
 
 const manifestPath = join(routesDir, "..", ".toggle-manifest");
@@ -164,13 +164,13 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
     for (const layoutPath of nestedLayouts.reverse()) {
       const src = await readFile(layoutPath, "utf-8");
       const layout = parseRoute(src);
-      body = router.renderTemplate(layout.template || src, { children: body }, ctx);
+      body = router.renderTemplate(layout.template || src, { children: raw(body) }, ctx);
     }
     const toggleInputs = ctx.toggleRegistry.emit();
 
     let deferredScript = '';
     if (ctx.deferredRegistry.hasEntries()) {
-      const requestId = String(++deferredRequestId);
+      const requestId = crypto.randomUUID();
       pendingDeferreds.set(requestId, ctx.deferredRegistry.entries());
       setTimeout(() => pendingDeferreds.delete(requestId), 60_000);
       deferredScript = `<script>(function(){` +
@@ -200,12 +200,12 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
     for (const layoutPath of nestedLayouts.reverse()) {
       const src = await readFile(layoutPath, "utf-8");
       const layout = parseRoute(src);
-      body = router.renderTemplate(layout.template || src, { children: body }, ctx);
+      body = router.renderTemplate(layout.template || src, { children: raw(body) }, ctx);
     }
     if (rootLayout) {
       const src = await readFile(rootLayout, "utf-8");
       const layout = parseRoute(src);
-      body = router.renderTemplate(layout.template || src, { children: body }, ctx);
+      body = router.renderTemplate(layout.template || src, { children: raw(body) }, ctx);
       body = mergeChannels(body);
     }
     const toggleInputs = ctx.toggleRegistry.emit();
@@ -253,13 +253,13 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
         for (const layoutPath of nestedLayouts.reverse()) {
           const src = await readFile(layoutPath, "utf-8");
           const layout = parseRoute(src);
-          body = router.renderTemplate(layout.template || src, { children: body }, ctx);
+          body = router.renderTemplate(layout.template || src, { children: raw(body) }, ctx);
         }
 
         if (rootLayout) {
           const src = await readFile(rootLayout, "utf-8");
           const layout = parseRoute(src);
-          body = router.renderTemplate(layout.template || src, { children: body }, ctx);
+          body = router.renderTemplate(layout.template || src, { children: raw(body) }, ctx);
           body = mergeChannels(body);
         }
 

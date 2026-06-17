@@ -1,7 +1,7 @@
 import { join, basename } from "path";
 import { readdir, readFile } from "fs/promises";
 import htm from "htm";
-import { html, h as baseH, type HtmlChild, type PropValue } from "./render";
+import { html, h as baseH, raw, escapeHtml, type HtmlChild, type PropValue } from "./render";
 import { renderStorage, type RenderContext } from "./state";
 import type { FrameworkContext } from "./plugin";
 import { Deferred, isDeferred } from "./deferred";
@@ -150,8 +150,10 @@ function transformImports(script: string): string {
 export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
   const componentCache: Record<string, ComponentFn> = {};
   const routeContexts: Record<string, Promise<RouteContext>> = {};
+  const templateFnCache = new Map<string, Function>();
 
   function clearComponentCache(name?: string) {
+    templateFnCache.clear();
     if (name) {
       delete componentCache[name];
     } else {
@@ -160,6 +162,7 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
   }
 
   function clearRouteContext(filePath?: string) {
+    templateFnCache.clear();
     if (filePath) {
       delete routeContexts[filePath];
     } else {
@@ -175,6 +178,49 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
       get: () => renderStorage.getStore()?.db ?? frameworkCtx.db,
     });
     return obj;
+  }
+
+  function buildComponentFn(parsed: ParsedRoute): ComponentFn {
+    const templateVars = extractTemplateVars(parsed.template);
+    const tmpl = parsed.template;
+    const loaderCode = parsed.loader;
+
+    return (props: Record<string, unknown>, ctx?: RenderContext) => {
+      const data: Record<string, unknown> = {};
+
+      for (const v of templateVars) {
+        data[v] = undefined;
+      }
+
+      data.cls = undefined;
+
+      Object.assign(data, props);
+
+      if ("class" in data) {
+        data.cls = data.class;
+        delete data.class;
+      }
+
+      if (Array.isArray(data.children)) {
+        const joined = (data.children as unknown[])
+          .flat(Infinity)
+          .filter((c: unknown) => c != null && typeof c !== "boolean")
+          .join("");
+        data.children = joined ? raw(joined) : "";
+      }
+
+      if (loaderCode) {
+        const keys = Object.keys(data).filter(k => k !== 'hzml' && !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
+        const values = keys.map(k => data[k]);
+        const hzml = buildLoaderHzml();
+        const loaderFn = new Function('hzml', ...keys, `{\n${loaderCode}\n}`);
+        const result = loaderFn(hzml, ...values);
+        if (typeof result === "string") return result;
+        if (typeof result === "object" && result !== null) Object.assign(data, result);
+      }
+
+      return renderTemplate(tmpl, data, ctx);
+    };
   }
 
   async function loadFromDir(dir: string) {
@@ -194,46 +240,7 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
 
       if (!parsed.template) continue;
 
-      const templateVars = extractTemplateVars(parsed.template);
-
-      const tmpl = parsed.template;
-      const loaderCode = parsed.loader;
-
-      componentCache[name] = (props: Record<string, unknown>, ctx?: RenderContext) => {
-        const data: Record<string, unknown> = {};
-
-        for (const v of templateVars) {
-          data[v] = undefined;
-        }
-
-        data.cls = undefined;
-
-        Object.assign(data, props);
-
-        if ("class" in data) {
-          data.cls = data.class;
-          delete data.class;
-        }
-
-        if (Array.isArray(data.children)) {
-          data.children = (data.children as unknown[])
-            .flat(Infinity)
-            .filter((c: unknown) => c != null && typeof c !== "boolean")
-            .join("");
-        }
-
-        if (loaderCode) {
-          const keys = Object.keys(data).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
-          const values = keys.map(k => data[k]);
-          const hzml = buildLoaderHzml();
-          const loaderFn = new Function('hzml', ...keys, `{\n${loaderCode}\n}`);
-          const result = loaderFn(hzml, ...values);
-          if (typeof result === "string") return result;
-          if (typeof result === "object" && result !== null) Object.assign(data, result);
-        }
-
-        return renderTemplate(tmpl, data, ctx);
-      };
+      componentCache[name] = buildComponentFn(parsed);
     }
   }
 
@@ -258,19 +265,19 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
       const reserved = new Set(['to', 'value', 'transform', 'then', 'tag', 'children']);
       const attrs = Object.entries(props)
         .filter(([k]) => !reserved.has(k))
-        .map(([k, v]) => k === 'class' ? ` class="${v}"` : ` ${k}="${v}"`)
+        .map(([k, v]) => ` ${k}="${escapeHtml(String(v))}"`)
         .join('');
 
       let onclick = '';
       if (transform) {
         onclick = `hzml.set('${to}',${transform.toString()})`;
       } else if (value !== undefined) {
-        const escaped = String(value).replace(/'/g, "\\'");
+        const escaped = String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
         onclick = `hzml.set('${to}','${escaped}')`;
       }
       if (then) onclick += ';' + then;
 
-      const onclickAttr = onclick ? ` onclick="${onclick}"` : '';
+      const onclickAttr = onclick ? ` onclick="${escapeHtml(onclick)}"` : '';
       const typeAttr = tag === 'button' ? ' type="button"' : '';
       return `<${tag}${typeAttr}${onclickAttr}${attrs}>${children}</${tag}>`;
     };
@@ -278,7 +285,7 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
     componentCache['Dispatched'] = (props: Record<string, unknown>) => {
       const by = props.by as string;
       const tag = props.tag as string | undefined;
-      const value = props.value as string || '';
+      const value = props.value == null ? '' : String(props.value);
       const name = props.name as string | undefined;
       const cls = (props.class as string) || '';
       const children = Array.isArray(props.children)
@@ -286,9 +293,9 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
         : (props.children || '');
 
       if (tag) {
-        return `<${tag} data-d="${by}"${cls ? ` class="${cls}"` : ''}>${children || value}</${tag}>`;
+        return `<${tag} data-d="${escapeHtml(by)}"${cls ? ` class="${escapeHtml(cls)}"` : ''}>${children || escapeHtml(value)}</${tag}>`;
       }
-      return `<input data-d="${by}" value="${value}" name="${name || by}" type="hidden">`;
+      return `<input data-d="${escapeHtml(by)}" value="${escapeHtml(value)}" name="${escapeHtml(name || by)}" type="hidden">`;
     };
 
     componentCache['Toggler'] = (props: Record<string, unknown>) => {
@@ -373,46 +380,7 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
       return;
     }
 
-    const templateVars = extractTemplateVars(parsed.template);
-    const tmpl = parsed.template;
-    const loaderCode = parsed.loader;
-
-    componentCache[name] = (props: Record<string, unknown>, ctx?: RenderContext) => {
-      const data: Record<string, unknown> = {};
-
-      data.cls = undefined;
-      Object.assign(data, props);
-
-      if ("class" in data) {
-        data.cls = data.class;
-        delete data.class;
-      }
-
-      if (Array.isArray(data.children)) {
-        data.children = (data.children as unknown[])
-          .flat(Infinity)
-          .filter((c: unknown) => c != null && typeof c !== "boolean")
-          .join("");
-      }
-
-      if (loaderCode) {
-        const keys = Object.keys(data).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
-        const values = keys.map(k => data[k]);
-        const hzml = buildLoaderHzml();
-        const loaderFn = new Function('hzml', ...keys, loaderCode);
-        const result = loaderFn(hzml, ...values);
-        if (typeof result === "string") return result;
-        if (typeof result === "object" && result !== null) Object.assign(data, result);
-      }
-
-      for (const v of templateVars) {
-        if (!(v in data)) {
-          data[v] = undefined;
-        }
-      }
-
-      return renderTemplate(tmpl, data, ctx);
-    };
+    componentCache[name] = buildComponentFn(parsed);
   }
 
   function getRouteContext(script: string, filePath: string): Promise<RouteContext> {
@@ -479,7 +447,9 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
     if (!template) return "";
 
     const allData = { ...componentCache, ...frameworkCtx.injections, ...data };
-    const keys = Object.keys(allData).filter(k => !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
+    const keys = Object.keys(allData).filter(k =>
+      k !== "html" && k !== "raw" && !RESERVED.has(k) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k)
+    );
     const values = keys.map(k => allData[k]);
 
     let htmlFn: (strings: TemplateStringsArray, ...vals: unknown[]) => string;
@@ -487,21 +457,26 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
     if (ctx) {
       const ctxH = (type: string | ComponentFn, props: Record<string, PropValue> | null, ...children: HtmlChild[]): string => {
         if (typeof type === "function") {
-          return type({ ...props, children: children.flat() }, ctx);
+          return raw(type({ ...props, children: children.flat() }, ctx));
         }
         return baseH(type, props, ...children);
       };
       const _ctxHtml = htm.bind(ctxH);
       htmlFn = (strings: TemplateStringsArray, ...vals: unknown[]): string => {
         const result = _ctxHtml(strings, ...vals);
-        return Array.isArray(result) ? (result as string[]).join("") : result as string;
+        return raw(Array.isArray(result) ? (result as string[]).join("") : result as string);
       };
     } else {
       htmlFn = html;
     }
 
-    const fn = new Function("html", ...keys, "return html`" + template + "`");
-    return fn(htmlFn, ...values);
+    const cacheKey = template + "\0" + keys.join(",");
+    let fn = templateFnCache.get(cacheKey);
+    if (!fn) {
+      fn = new Function("html", "raw", ...keys, "return html`" + template + "`");
+      templateFnCache.set(cacheKey, fn);
+    }
+    return String(fn(htmlFn, raw, ...values));
   }
 
   return {

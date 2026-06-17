@@ -4,28 +4,54 @@ type ComponentFn = (props: Record<string, unknown>) => string;
 export type HtmlChild = string | number | boolean | null | undefined | HtmlChild[];
 export type PropValue = string | number | boolean | null | undefined;
 
+export class SafeHtml extends String {}
+
+export function raw(value: unknown): string {
+  return new SafeHtml(value == null ? "" : String(value)) as unknown as string;
+}
+
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escapeChild(child: unknown): string {
+  if (child == null || typeof child === "boolean") return "";
+  if (child instanceof SafeHtml) return String(child);
+  return escapeHtml(String(child));
+}
+
+function escapeAttr(value: unknown): string {
+  if (value instanceof SafeHtml) return String(value);
+  return escapeHtml(String(value));
+}
+
 export function h(type: string | ComponentFn, props: Record<string, PropValue> | null, ...children: HtmlChild[]): string {
   if (typeof type === "function") {
-    return type({ ...props, children: children.flat() });
+    return raw(type({ ...props, children: children.flat() }));
   }
 
   const attrs = props
     ? Object.entries(props)
         .filter(([_, v]) => v !== false && v != null)
-        .map(([k, v]) => v === true ? ` ${k}` : ` ${k}="${v}"`)
+        .map(([k, v]) => v === true ? ` ${k}` : ` ${k}="${escapeAttr(v)}"`)
         .join("")
     : "";
 
   const inner = children
     .flat(Infinity)
-    .map((c) => (c == null || typeof c === "boolean" ? "" : String(c)))
+    .map(escapeChild)
     .join("");
 
   if (VOID_TAGS.has(type)) {
-    return `<${type}${attrs}>`;
+    return raw(`<${type}${attrs}>`);
   }
 
-  return `<${type}${attrs}>${inner}</${type}>`;
+  return raw(`<${type}${attrs}>${inner}</${type}>`);
 }
 
 const VOID_TAGS = new Set([
@@ -37,5 +63,5 @@ const _html = htm.bind(h);
 
 export function html(strings: TemplateStringsArray, ...values: unknown[]): string {
   const result = _html(strings, ...values);
-  return Array.isArray(result) ? result.join("") : result;
+  return raw(Array.isArray(result) ? result.join("") : result);
 }
