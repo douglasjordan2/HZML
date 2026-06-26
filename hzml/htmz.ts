@@ -1,11 +1,11 @@
-export function htmzHead(): string {
+export function htmzHead(routeHead = ""): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HZML</title>
   <link rel="stylesheet" href="/app.css">
+  ${routeHead || "<title>HZML</title>"}
 </head>
 <body class="group/root">
 `;

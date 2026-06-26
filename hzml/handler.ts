@@ -215,7 +215,7 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
-        controller.enqueue(encoder.encode(htmzHead()));
+        controller.enqueue(encoder.encode(htmzHead(route.head)));
         controller.enqueue(encoder.encode(toggleCSS + body));
         controller.enqueue(encoder.encode(htmzTail(scriptTag, devClientScript ?? "")));
         controller.close();
@@ -229,7 +229,7 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      controller.enqueue(encoder.encode(htmzHead()));
+      controller.enqueue(encoder.encode(htmzHead(route.head)));
 
       try {
         const data = await router.executeScript(route.script!, request, match.params, match.filePath);
