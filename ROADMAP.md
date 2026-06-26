@@ -49,7 +49,7 @@
 
 ## Next
 - HTMZ append mode: data-hzml-append="target-id" on response elements appends children instead of replacing (load more, chat, infinite scroll — opt-in, server still authoritative on refresh)
-- Head tag architecture: per-route `<head>` block (title, meta, canonical, JSON-LD) spliced into full-page renders ✓ — remaining: title/meta updates on HTMZ partial nav
+- Head tag architecture: per-route `<head>` block (title, meta, canonical, JSON-LD), layout-contributed base head with singleton de-dup (route wins), and title/meta swap on HTMZ partial nav ✓
 - Tree-sitter v2: custom template parsing for HTM syntax (${expr}, <${Component}>, <//> highlighting)
 - Async loaders: today component `<loader>` blocks are sync. Lifting that requires propagating Promise<string> through h()/htm — real refactor, deferred until a real use case demands it.
 
