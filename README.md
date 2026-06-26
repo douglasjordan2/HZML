@@ -165,7 +165,20 @@ A route can declare its own `<head>` block alongside `<server>` / `<template>`. 
 </template>
 ```
 
-The `<head>` block is injected verbatim — it is **not** run through the template engine, so literal JSON-LD with `{ }` is safe (no `${}` interpolation). A route that omits `<head>` falls back to a default `<title>`. Per-route heads only affect full-page loads; HTMZ partial swaps reuse the existing document head.
+The `<head>` block is injected verbatim — it is **not** run through the template engine, so literal JSON-LD with `{ }` is safe (no `${}` interpolation). A route that omits `<head>` falls back to a default `<title>`.
+
+**Layouts can contribute base head tags.** A `layout.hzml` may declare its own `<head>` for site-wide defaults (default title, OG `site_name`, favicon). The framework merges heads from the outermost layout inward, then the route on top. Singleton tags — `<title>`, `<meta name>`, `<meta property>`, `<meta http-equiv>`, and `<link rel="canonical">` — are de-duplicated, with the most specific source winning (route over layout). Everything else (extra `<link>`s, multiple JSON-LD blocks) accumulates.
+
+```html
+<!-- routes/layout.hzml -->
+<head>
+  <title>My Site</title>
+  <meta property="og:site_name" content="My Site" />
+  <link rel="icon" href="/favicon.ico" />
+</head>
+```
+
+**Head updates on HTMZ navigation, too.** Merged head tags are tagged internally so that when you navigate via an HTMZ link, the client swaps the document's `<title>` and metadata to match the destination page — keeping the browser tab title, canonical, and OG tags correct without a full reload. The universal chrome (charset, viewport, stylesheet) is never touched.
 
 ### Layouts
 

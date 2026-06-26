@@ -5,7 +5,7 @@ import type { HzmlRouter } from "./router";
 import { createToggleRegistry, createDeferredRegistry, createQueryCache, renderStorage, type RenderContext } from "./state";
 import { isDeferred } from "./deferred";
 import type { Deferred } from "./deferred";
-import { htmzHead, htmzTail } from "./htmz";
+import { htmzHead, htmzTail, mergeHead } from "./htmz";
 import { matchFromTable, fileExists, type RouteMatch, type RouteTable } from "./match";
 import { raw } from "./render";
 import { renderErrorOverlay } from "./dev";
@@ -149,6 +149,21 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
   const route = parseRoute(source);
   const clientScript = route.clientScript || '';
 
+  // Read every layout once (outermost-first); reused for both head merging
+  // and body wrapping below.
+  const layoutCache = new Map(
+    await Promise.all(match.layouts.map(async (p) => {
+      const src = await readFile(p, "utf-8");
+      return [p, { src, parsed: parseRoute(src) }] as const;
+    }))
+  );
+
+  // Layout heads (root → nested) extended/overridden by the route head, with a
+  // marked fallback <title> so partial navigation can always reset the head.
+  const composedHead =
+    mergeHead(...match.layouts.map((p) => layoutCache.get(p)!.parsed.head), route.head) ||
+    '<title data-hzml-head>HZML</title>';
+
   if (isPartial) {
     let body: string;
     if (route.script) {
@@ -162,8 +177,7 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
     const scriptTag = clientScript ? `<script>${clientScript}</script>` : '';
     const [, ...nestedLayouts] = match.layouts;
     for (const layoutPath of nestedLayouts.reverse()) {
-      const src = await readFile(layoutPath, "utf-8");
-      const layout = parseRoute(src);
+      const { src, parsed: layout } = layoutCache.get(layoutPath)!;
       body = router.renderTemplate(layout.template || src, { children: raw(body) }, ctx);
     }
     const toggleInputs = ctx.toggleRegistry.emit();
@@ -190,7 +204,8 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
         `})()</script>`;
     }
 
-    return htmlResponse(`<div id="content">${toggleInputs}${body}${scriptTag}</div>${deferredScript}`);
+    const headPayload = `<template id="__hzml-head">${composedHead}</template>`;
+    return htmlResponse(`${headPayload}<div id="content">${toggleInputs}${body}${scriptTag}</div>${deferredScript}`);
   }
 
   if (!route.script) {
@@ -198,13 +213,11 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
     const scriptTag = clientScript ? `<script>${clientScript}</script>` : '';
     const [rootLayout, ...nestedLayouts] = match.layouts;
     for (const layoutPath of nestedLayouts.reverse()) {
-      const src = await readFile(layoutPath, "utf-8");
-      const layout = parseRoute(src);
+      const { src, parsed: layout } = layoutCache.get(layoutPath)!;
       body = router.renderTemplate(layout.template || src, { children: raw(body) }, ctx);
     }
     if (rootLayout) {
-      const src = await readFile(rootLayout, "utf-8");
-      const layout = parseRoute(src);
+      const { src, parsed: layout } = layoutCache.get(rootLayout)!;
       body = router.renderTemplate(layout.template || src, { children: raw(body) }, ctx);
       body = mergeChannels(body);
     }
@@ -215,7 +228,7 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
-        controller.enqueue(encoder.encode(htmzHead(route.head)));
+        controller.enqueue(encoder.encode(htmzHead(composedHead)));
         controller.enqueue(encoder.encode(toggleCSS + body));
         controller.enqueue(encoder.encode(htmzTail(scriptTag, devClientScript ?? "")));
         controller.close();
@@ -229,7 +242,7 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      controller.enqueue(encoder.encode(htmzHead(route.head)));
+      controller.enqueue(encoder.encode(htmzHead(composedHead)));
 
       try {
         const data = await router.executeScript(route.script!, request, match.params, match.filePath);
@@ -251,14 +264,12 @@ async function renderRouteInner(match: RouteMatch, isPartial: boolean, request: 
         const [rootLayout, ...nestedLayouts] = match.layouts;
 
         for (const layoutPath of nestedLayouts.reverse()) {
-          const src = await readFile(layoutPath, "utf-8");
-          const layout = parseRoute(src);
+          const { src, parsed: layout } = layoutCache.get(layoutPath)!;
           body = router.renderTemplate(layout.template || src, { children: raw(body) }, ctx);
         }
 
         if (rootLayout) {
-          const src = await readFile(rootLayout, "utf-8");
-          const layout = parseRoute(src);
+          const { src, parsed: layout } = layoutCache.get(rootLayout)!;
           body = router.renderTemplate(layout.template || src, { children: raw(body) }, ctx);
           body = mergeChannels(body);
         }
