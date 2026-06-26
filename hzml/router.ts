@@ -23,6 +23,7 @@ interface ParsedRoute {
   clientScript: string;
   loader: string;
   template: string;
+  head: string;
 }
 
 export function parseRoute(source: string): ParsedRoute {
@@ -30,12 +31,14 @@ export function parseRoute(source: string): ParsedRoute {
   const clientScriptMatch = source.match(/<script>([\s\S]*?)<\/script>/);
   const loaderMatch = source.match(/<loader>([\s\S]*?)<\/loader>/);
   const templateMatch = source.match(/<template>([\s\S]*?)<\/template>/);
+  const headMatch = source.match(/<head>([\s\S]*?)<\/head>/);
 
   return {
     script: scriptMatch?.[1]?.trim() || "",
     clientScript: clientScriptMatch?.[1]?.trim() || "",
     loader: loaderMatch?.[1]?.trim() || "",
     template:  templateMatch?.[1]?.trim() || "",
+    head: headMatch?.[1]?.trim() || "",
   };
 }
 

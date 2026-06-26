@@ -148,6 +148,25 @@ Name a file with `$` prefix — `$id.hzml` matches `/blog/anything` and exposes 
 </template>
 ```
 
+### Per-route metadata
+
+A route can declare its own `<head>` block alongside `<server>` / `<template>`. The framework keeps the universal chrome (charset, viewport, stylesheet) and splices the route's head into the document head for full-page renders. This gives each route its own `<title>`, `meta description`, canonical link, Open Graph tags, and page-specific JSON-LD — essential for multi-page sites where every page would otherwise inherit the homepage's metadata:
+
+```html
+<head>
+  <title>My Page</title>
+  <meta name="description" content="..." />
+  <link rel="canonical" href="https://example.com/my-page" />
+  <script type="application/ld+json">{ "@type": "WebPage" }</script>
+</head>
+
+<template>
+  <h1>My Page</h1>
+</template>
+```
+
+The `<head>` block is injected verbatim — it is **not** run through the template engine, so literal JSON-LD with `{ }` is safe (no `${}` interpolation). A route that omits `<head>` falls back to a default `<title>`. Per-route heads only affect full-page loads; HTMZ partial swaps reuse the existing document head.
+
 ### Layouts
 
 Add `layout.hzml` at any directory level. Layouts nest automatically — a route in `routes/blog/` gets both the root layout and the blog layout:
