@@ -1,0 +1,2 @@
+<loader>if (upper) return String(word).toUpperCase(); return null</loader>
+<template><span>${word}</span></template>

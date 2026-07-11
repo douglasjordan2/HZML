@@ -1,0 +1,2 @@
+<loader>const rows = hzml.db.query("SELECT n"); return { n: rows[0].n }</loader>
+<template><i>${n}</i></template>

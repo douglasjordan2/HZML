@@ -1,0 +1,2 @@
+<loader>return { doubled: n * 2 }</loader>
+<template><b>${n}:${doubled}</b></template>
