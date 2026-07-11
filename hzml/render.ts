@@ -19,7 +19,7 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function escapeChild(child: unknown): string {
+export function escapeChild(child: unknown): string {
   if (child == null || typeof child === "boolean") return "";
   if (child instanceof SafeHtml) return String(child);
   return escapeHtml(String(child));
@@ -63,5 +63,5 @@ const _html = htm.bind(h);
 
 export function html(strings: TemplateStringsArray, ...values: unknown[]): string {
   const result = _html(strings, ...values);
-  return raw(Array.isArray(result) ? result.join("") : result);
+  return raw(Array.isArray(result) ? result.flat(Infinity).map(escapeChild).join("") : result);
 }

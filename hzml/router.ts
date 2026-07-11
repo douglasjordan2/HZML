@@ -1,7 +1,7 @@
 import { join, basename } from "path";
 import { readdir, readFile } from "fs/promises";
 import htm from "htm";
-import { html, h as baseH, raw, escapeHtml, type HtmlChild, type PropValue } from "./render";
+import { html, h as baseH, raw, escapeHtml, escapeChild, type HtmlChild, type PropValue } from "./render";
 import { renderStorage, type RenderContext } from "./state";
 import type { FrameworkContext } from "./plugin";
 import { Deferred, isDeferred } from "./deferred";
@@ -464,7 +464,7 @@ export function initRouter(frameworkCtx: FrameworkContext): HzmlRouter {
       const _ctxHtml = htm.bind(ctxH);
       htmlFn = (strings: TemplateStringsArray, ...vals: unknown[]): string => {
         const result = _ctxHtml(strings, ...vals);
-        return raw(Array.isArray(result) ? (result as string[]).join("") : result as string);
+        return raw(Array.isArray(result) ? result.flat(Infinity).map(escapeChild).join("") : result as string);
       };
     } else {
       htmlFn = html;
