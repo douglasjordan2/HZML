@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "test": "bun test hzml",
     "dev": "bun run build && bun run css:watch & bun --watch index.ts",
     "build": "touch .toggle-manifest && bunx @tailwindcss/cli -i app.css -o public/app.css --minify",
     "css:watch": "touch .toggle-manifest && bunx @tailwindcss/cli -i app.css -o public/app.css --watch=always"
