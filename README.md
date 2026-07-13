@@ -511,6 +511,16 @@ HZML includes a built-in dev server with hot reload. When the server starts, it 
 
 No configuration needed — hot reload is always on during development.
 
+## Testing
+
+The framework core is covered by a bun:test suite — 144 tests across every module in `hzml/`, running in well under a second with zero extra dependencies.
+
+```bash
+bun run test
+```
+
+Tests are colocated with their modules (`hzml/<module>.test.ts`), fixtures live in `hzml/fixtures/`, and HTTP tests call the handler directly — no ports, no real database, no network. CI runs the suite on every pull request. See [CONTRIBUTING.md](CONTRIBUTING.md) for the conventions.
+
 ## Streaming
 
 HZML supports streaming HTML responses using `hzml.defer()` and the `<Suspense>` component. Slow data sources can resolve after the initial page shell is sent, replacing a fallback with the real content when it arrives — similar to Remix's `defer` pattern.
